@@ -9,28 +9,59 @@ function useRollingBuffer(size) {
   return [ref, push];
 }
 
-function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100 }) {
-  const padding = 8;
-  const w = width - padding * 2;
-  const h = height - padding * 2;
+function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100, showAxes = false, yTicks, xLabels }) {
+  const paddingLeft = showAxes ? 34 : 8;
+  const paddingBottom = showAxes ? 18 : 8;
+  const paddingTopRight = 8;
+  const w = width - paddingLeft - paddingTopRight;
+  const h = height - paddingTopRight - paddingBottom;
   const points = useMemo(() => {
     if (!data || data.length === 0) return '';
     const len = data.length;
     return data.map((v, i) => {
-      const x = (i / Math.max(1, len - 1)) * w + padding;
+      const x = (i / Math.max(1, len - 1)) * w + paddingLeft;
       const clamped = Math.max(min, Math.min(max, v));
-      const y = height - padding - ((clamped - min) / (max - min)) * h;
+      const y = height - paddingBottom - ((clamped - min) / (max - min)) * h;
       return `${x},${y}`;
     }).join(' ');
-  }, [data, w, h, height, padding, min, max]);
+  }, [data, w, h, height, paddingLeft, paddingBottom, min, max]);
 
   return (
     <svg width={width} height={height} style={{ display: 'block', background: bg, borderRadius: 8 }}>
       {grid && (
         <g opacity="0.15" stroke="#ffffff">
           {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-            <line key={t} x1={padding} x2={width - padding} y1={padding + (h * t)} y2={padding + (h * t)} />
+            <line key={t} x1={paddingLeft} x2={width - paddingTopRight} y1={paddingTopRight + (h * t)} y2={paddingTopRight + (h * t)} />
           ))}
+        </g>
+      )}
+      {showAxes && (
+        <g>
+          {/* Y axis */}
+          <line x1={paddingLeft} y1={paddingTopRight} x2={paddingLeft} y2={height - paddingBottom} stroke="#9CA3AF" strokeWidth="1" />
+          {/* X axis */}
+          <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingTopRight} y2={height - paddingBottom} stroke="#9CA3AF" strokeWidth="1" />
+          {/* Y ticks */}
+          {(() => {
+            const ticks = yTicks && yTicks.length ? yTicks : [min, (min + max) / 2, max];
+            return ticks.map((tv, idx) => {
+              const y = height - paddingBottom - ((tv - min) / (max - min)) * h;
+              return (
+                <g key={`yt-${idx}`}>
+                  <line x1={paddingLeft - 4} x2={paddingLeft} y1={y} y2={y} stroke="#9CA3AF" strokeWidth="1" />
+                  <text x={paddingLeft - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize="10" fill="#9CA3AF" fontFamily="monospace">{Math.round(tv)}</text>
+                </g>
+              );
+            });
+          })()}
+          {/* X labels */}
+          {xLabels && xLabels.length > 0 && xLabels.map((xl, idx) => {
+            const len = Math.max(1, data.length - 1);
+            const x = (xl.i / len) * w + paddingLeft;
+            return (
+              <text key={`xl-${idx}`} x={x} y={height - 2} textAnchor="middle" fontSize="10" fill="#9CA3AF" fontFamily="monospace">{xl.label}</text>
+            );
+          })}
         </g>
       )}
       <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
@@ -87,6 +118,9 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const [fpsBuf, pushFps] = useRollingBuffer(120);
   const [utilBuf, pushUtil] = useRollingBuffer(120);
   const [tempBuf, pushTemp] = useRollingBuffer(120);
+  const [co2HistRef, pushCo2Hist] = useRollingBuffer(60);
+  const [powerHistRef, pushPowerHist] = useRollingBuffer(60);
+  const bucketRef = useRef({ samples: [], lastTs: performance.now() });
 
   useEffect(() => {
     if (!gpuMonitor) return;
@@ -96,6 +130,18 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
       pushFps(s.fps || 0);
       pushUtil(s.gpu.utilization || 0);
       pushTemp(s.gpu.temperature || 0);
+      // Aggregate power samples into 5s CO2 buckets
+      bucketRef.current.samples.push(s.gpu.power || 0);
+      const now = performance.now();
+      if (now - bucketRef.current.lastTs >= 5000) {
+        const arr = bucketRef.current.samples;
+        const avgPower = arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+        const co2PerHour = avgPower * gridFactorGramsPerWh; // grams/hour
+        pushCo2Hist(co2PerHour);
+        pushPowerHist(avgPower);
+        bucketRef.current.samples = [];
+        bucketRef.current.lastTs = now;
+      }
     }, 200);
     return () => clearInterval(id);
   }, [gpuMonitor]);
@@ -108,7 +154,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
     border: '1px solid rgba(255,255,255,0.08)',
     borderRadius: 12,
     padding: 16,
-    color: 'white',
+    color: 'white'
   };
 
   const powerBase = baselinePowerAvg ?? stats?.gpu?.power ?? 0;
@@ -117,7 +163,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const co2Opt = powerOpt * gridFactorGramsPerWh;
 
   return (
-    <div style={{ position: 'fixed', inset: 'auto 10px 10px auto', width: 720, maxWidth: '95vw', zIndex: 1002 }}>
+    <div style={{ position: 'relative', width: 720, maxWidth: '95vw', margin: '0 auto' }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
@@ -125,6 +171,21 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.fps.toFixed(1)}</div>
           </div>
           <LineChart data={[...fpsBuf.current]} color="#00E5FF" max={120} />
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>CO2 (g/hour, 5s)</div>
+            {co2HistRef.current.length > 0 && (
+              <div style={{ fontFamily: 'monospace', fontSize: 14 }}>{co2HistRef.current[co2HistRef.current.length - 1].toFixed(0)} g/h</div>
+            )}
+          </div>
+          <LineChart 
+            data={[...co2HistRef.current]} 
+            color="#FFA726" 
+            min={0} 
+            max={Math.max(20, Math.max(...(co2HistRef.current.length ? co2HistRef.current : [0])))} 
+          />
         </div>
 
         <div style={cardStyle}>
@@ -157,24 +218,25 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
         </div>
 
         <div style={cardStyle}>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Memory</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Used</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)} MB</div>
-            </div>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Total</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.total / 1048576).toFixed(1)} MB</div>
-            </div>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>GPU Mem Used</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.used / 1048576).toFixed(1)} MB</div>
-            </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>Energy (Avg Power, 5s)</div>
+            {powerHistRef.current.length > 0 && (
+              <div style={{ fontFamily: 'monospace', fontSize: 14 }}>{powerHistRef.current[powerHistRef.current.length - 1].toFixed(0)} W</div>
+            )}
           </div>
+          <LineChart
+            data={[...powerHistRef.current]}
+            height={150}
+            color="#42A5F5"
+            min={0}
+            max={Math.max(150, Math.max(...(powerHistRef.current.length ? powerHistRef.current : [0])))}
+            showAxes={true}
+            yTicks={[0, 50, 100, 150, 200]}
+            xLabels={[{ i: 0, label: 'T-5m' }, { i: Math.floor((powerHistRef.current.length - 1) / 2), label: 'T-2.5m' }, { i: Math.max(0, powerHistRef.current.length - 1), label: 'Now' }]}
+          />
         </div>
 
-        <div style={{ ...cardStyle }}>
+        {/* <div style={{ ...cardStyle }}>
           <BarComparison
             title="Energy (Average Power)"
             leftLabel="Baseline"
@@ -198,7 +260,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             colorLeft="#FFA726"
             colorRight="#26A69A"
           />
-        </div>
+        </div> */}
       </div>
     </div>
   );

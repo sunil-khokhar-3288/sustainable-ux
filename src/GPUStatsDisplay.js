@@ -42,8 +42,8 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
   return (
     <div style={{
       position: 'fixed',
-      top: '0px',
-      right: '10px',
+      top: '50px',
+      left: '10px',
       background: 'rgba(0, 0, 0, 0.8)',
       color: 'white',
       padding: '10px',
@@ -102,7 +102,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
         </div>
       )}
 
-      {optimizationInfo && (
+      {/* {optimizationInfo && (
         <div style={{ marginBottom: '8px' }}>
           <strong>Optimizations ({mode === 'optimized' ? 'Optimized' : 'Baseline'}):</strong>
           <div style={{ marginLeft: '10px' }}>
@@ -113,7 +113,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
             <div>Pause on Hidden: {optimizationInfo.pauseOnHidden ? 'Yes' : 'No'}</div>
           </div>
         </div>
-      )}
+      )} */}
       
       <div style={{ marginBottom: '6px' }}>
         <strong>GPU Utilization:</strong>
@@ -130,7 +130,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
             background: '#333', 
             borderRadius: '4px',
             overflow: 'hidden',
-            marginTop: '2px'
+            marginTop: '10px'
           }}>
             <div style={{
               width: `${stats.gpu.utilization}%`,
