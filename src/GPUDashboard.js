@@ -9,59 +9,28 @@ function useRollingBuffer(size) {
   return [ref, push];
 }
 
-function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100, showAxes = false, yTicks, xLabels }) {
-  const paddingLeft = showAxes ? 34 : 8;
-  const paddingBottom = showAxes ? 18 : 8;
-  const paddingTopRight = 8;
-  const w = width - paddingLeft - paddingTopRight;
-  const h = height - paddingTopRight - paddingBottom;
+function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100 }) {
+  const padding = 8;
+  const w = width - padding * 2;
+  const h = height - padding * 2;
   const points = useMemo(() => {
     if (!data || data.length === 0) return '';
     const len = data.length;
     return data.map((v, i) => {
-      const x = (i / Math.max(1, len - 1)) * w + paddingLeft;
+      const x = (i / Math.max(1, len - 1)) * w + padding;
       const clamped = Math.max(min, Math.min(max, v));
-      const y = height - paddingBottom - ((clamped - min) / (max - min)) * h;
+      const y = height - padding - ((clamped - min) / (max - min)) * h;
       return `${x},${y}`;
     }).join(' ');
-  }, [data, w, h, height, paddingLeft, paddingBottom, min, max]);
+  }, [data, w, h, height, padding, min, max]);
 
   return (
     <svg width={width} height={height} style={{ display: 'block', background: bg, borderRadius: 8 }}>
       {grid && (
         <g opacity="0.15" stroke="#ffffff">
           {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-            <line key={t} x1={paddingLeft} x2={width - paddingTopRight} y1={paddingTopRight + (h * t)} y2={paddingTopRight + (h * t)} />
+            <line key={t} x1={padding} x2={width - padding} y1={padding + (h * t)} y2={padding + (h * t)} />
           ))}
-        </g>
-      )}
-      {showAxes && (
-        <g>
-          {/* Y axis */}
-          <line x1={paddingLeft} y1={paddingTopRight} x2={paddingLeft} y2={height - paddingBottom} stroke="#9CA3AF" strokeWidth="1" />
-          {/* X axis */}
-          <line x1={paddingLeft} y1={height - paddingBottom} x2={width - paddingTopRight} y2={height - paddingBottom} stroke="#9CA3AF" strokeWidth="1" />
-          {/* Y ticks */}
-          {(() => {
-            const ticks = yTicks && yTicks.length ? yTicks : [min, (min + max) / 2, max];
-            return ticks.map((tv, idx) => {
-              const y = height - paddingBottom - ((tv - min) / (max - min)) * h;
-              return (
-                <g key={`yt-${idx}`}>
-                  <line x1={paddingLeft - 4} x2={paddingLeft} y1={y} y2={y} stroke="#9CA3AF" strokeWidth="1" />
-                  <text x={paddingLeft - 6} y={y} textAnchor="end" dominantBaseline="middle" fontSize="10" fill="#9CA3AF" fontFamily="monospace">{Math.round(tv)}</text>
-                </g>
-              );
-            });
-          })()}
-          {/* X labels */}
-          {xLabels && xLabels.length > 0 && xLabels.map((xl, idx) => {
-            const len = Math.max(1, data.length - 1);
-            const x = (xl.i / len) * w + paddingLeft;
-            return (
-              <text key={`xl-${idx}`} x={x} y={height - 2} textAnchor="middle" fontSize="10" fill="#9CA3AF" fontFamily="monospace">{xl.label}</text>
-            );
-          })}
         </g>
       )}
       <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
@@ -113,14 +82,11 @@ function BarComparison({ title, leftLabel, rightLabel, leftValue, rightValue, ma
   );
 }
 
-export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPowerAvg, gridFactorGramsPerWh = 0.4 }) {
+export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPowerAvg, gridFactorGramsPerWh = 0.4, settings, inModal = false, onApplyOptimizations, onExportMetrics }) {
   const [stats, setStats] = useState(gpuMonitor ? gpuMonitor.getStats() : null);
   const [fpsBuf, pushFps] = useRollingBuffer(120);
   const [utilBuf, pushUtil] = useRollingBuffer(120);
   const [tempBuf, pushTemp] = useRollingBuffer(120);
-  const [co2HistRef, pushCo2Hist] = useRollingBuffer(60);
-  const [powerHistRef, pushPowerHist] = useRollingBuffer(60);
-  const bucketRef = useRef({ samples: [], lastTs: performance.now() });
 
   useEffect(() => {
     if (!gpuMonitor) return;
@@ -130,18 +96,6 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
       pushFps(s.fps || 0);
       pushUtil(s.gpu.utilization || 0);
       pushTemp(s.gpu.temperature || 0);
-      // Aggregate power samples into 5s CO2 buckets
-      bucketRef.current.samples.push(s.gpu.power || 0);
-      const now = performance.now();
-      if (now - bucketRef.current.lastTs >= 5000) {
-        const arr = bucketRef.current.samples;
-        const avgPower = arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
-        const co2PerHour = avgPower * gridFactorGramsPerWh; // grams/hour
-        pushCo2Hist(co2PerHour);
-        pushPowerHist(avgPower);
-        bucketRef.current.samples = [];
-        bucketRef.current.lastTs = now;
-      }
     }, 200);
     return () => clearInterval(id);
   }, [gpuMonitor]);
@@ -149,12 +103,13 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   if (!stats) return null;
 
   const cardStyle = {
-    background: 'rgba(0, 0, 0, 0.65)',
-    backdropFilter: 'blur(6px)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    borderRadius: 12,
-    padding: 16,
-    color: 'white'
+    background: 'linear-gradient(180deg, rgba(16,18,24,0.95), rgba(12,14,18,0.92))',
+    backdropFilter: 'blur(10px)',
+    border: '1px solid rgba(148,163,184,0.14)',
+    borderRadius: 16,
+    padding: 18,
+    color: 'white',
+    boxShadow: '0 24px 48px rgba(0,0,0,0.5)'
   };
 
   const powerBase = baselinePowerAvg ?? stats?.gpu?.power ?? 0;
@@ -162,9 +117,62 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const co2Base = powerBase * gridFactorGramsPerWh;
   const co2Opt = powerOpt * gridFactorGramsPerWh;
 
+  // Estimate theme/resolution influence (illustrative model)
+  const themeFactor = settings?.theme === 'dark' ? 0.95 : settings?.theme === 'eink' ? 0.9 : settings?.theme === 'high-contrast' ? 0.98 : 1.0;
+  const resolutionFactor = (settings ? (Math.min(3, Math.max(0.5, settings.pixelRatioClamp || 1.5)) / 3) : (1.5/3))
+    * (settings ? (Math.min(1, Math.max(0.3, settings.viewportScale || 1))) : 1);
+  const fpsFactor = settings ? Math.min(1, (settings.targetFps || 30) / 60) : 0.5;
+  const estimatedRelativeEnergy = Math.max(0.15, themeFactor * (0.6 * resolutionFactor + 0.4 * fpsFactor));
+  const estimatedPower = Math.round(80 * estimatedRelativeEnergy);
+
+  const outerStyle = inModal
+    ? { width: '100%', maxWidth: 1240, margin: '0 auto' }
+    : { position: 'fixed', inset: 'auto 10px 10px auto', width: 720, maxWidth: '95vw', zIndex: 1002 };
+
   return (
-    <div style={{ position: 'relative', width: 720, maxWidth: '95vw', margin: '0 auto' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+    <div style={outerStyle}>
+      {/* KPI Row - multi-color palette */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18, padding: inModal ? '18px' : '0', paddingBottom: 0 }}>
+        {/* Energy (kWh) - amber */}
+        <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(145deg, rgba(120,53,15,0.5), rgba(245,158,11,0.25))', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>Energy (kWh)</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#FACC15' }}>{(stats.gpu.power / 1000).toFixed(6)}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>kWh</div>
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>Theme: {settings?.theme ?? 'n/a'}</div>
+        </div>
+
+        {/* GPU Utilization - green */}
+        <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(145deg, rgba(6,95,70,0.5), rgba(16,185,129,0.25))', border: '1px solid rgba(16,185,129,0.35)' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>GPU Utilization</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#10B981' }}>{stats.gpu.utilization}%</div>
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>Temp: {stats.gpu.temperature?.toFixed(1)}°C</div>
+        </div>
+
+        {/* Memory - blue */}
+        <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(145deg, rgba(30,58,138,0.5), rgba(59,130,246,0.25))', border: '1px solid rgba(59,130,246,0.35)' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>Memory (JS heap used)</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#60A5FA' }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>MB</div>
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>Textures: {stats.memory?.webgl?.textures || 0}</div>
+        </div>
+
+        {/* CO2 - red */}
+        <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(145deg, rgba(127,29,29,0.5), rgba(239,68,68,0.25))', border: '1px solid rgba(239,68,68,0.35)' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>CO₂ Emission (per hour)</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#F87171' }}>{(stats.gpu.power * gridFactorGramsPerWh).toFixed(1)}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>g</div>
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>Est. power: {estimatedPower} W</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: inModal ? '1fr 1fr' : '1fr 1fr', gap: 18, padding: inModal ? '18px' : '0' }}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>FPS</div>
@@ -175,25 +183,10 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
 
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>CO2 (g/hour, 5s)</div>
-            {co2HistRef.current.length > 0 && (
-              <div style={{ fontFamily: 'monospace', fontSize: 14 }}>{co2HistRef.current[co2HistRef.current.length - 1].toFixed(0)} g/h</div>
-            )}
-          </div>
-          <LineChart 
-            data={[...co2HistRef.current]} 
-            color="#FFA726" 
-            min={0} 
-            max={Math.max(20, Math.max(...(co2HistRef.current.length ? co2HistRef.current : [0])))} 
-          />
-        </div>
-
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>GPU Utilization</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.gpu.utilization}%</div>
           </div>
-          <LineChart data={[...utilBuf.current]} color="#4CAF50" />
+          <LineChart data={[...utilBuf.current]} color="#34D399" />
         </div>
 
         <div style={cardStyle}>
@@ -201,42 +194,64 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>GPU Temperature</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.gpu.temperature?.toFixed(1)}°C</div>
           </div>
-          <LineChart data={[...tempBuf.current]} color="#FF7043" max={90} />
+          <LineChart data={[...tempBuf.current]} color="#F59E0B" max={90} />
         </div>
 
-        <div style={{ ...cardStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+        <div style={{ ...cardStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'linear-gradient(145deg, rgba(120,53,15,0.5), rgba(245,158,11,0.25))' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Power</div>
-            <PieChart value={Math.min(100, (stats.gpu.power / 80) * 100)} color="#AB47BC" />
+            <PieChart value={Math.min(100, (stats.gpu.power / 80) * 100)} color="#8B5CF6" />
             <div style={{ fontFamily: 'monospace', fontSize: 14, marginTop: 6 }}>{stats.gpu.power} W</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Textures</div>
-            <PieChart value={Math.min(100, (stats.memory?.webgl?.textures || 0) / 64 * 100)} color="#26A69A" />
+            <PieChart value={Math.min(100, (stats.memory?.webgl?.textures || 0) / 64 * 100)} color="#22D3EE" />
             <div style={{ fontFamily: 'monospace', fontSize: 14, marginTop: 6 }}>{stats.memory?.webgl?.textures || 0}</div>
           </div>
         </div>
 
-        <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>Energy (Avg Power, 5s)</div>
-            {powerHistRef.current.length > 0 && (
-              <div style={{ fontFamily: 'monospace', fontSize: 14 }}>{powerHistRef.current[powerHistRef.current.length - 1].toFixed(0)} W</div>
-            )}
+        <div style={{ ...cardStyle, background: 'linear-gradient(145deg, rgba(239, 189, 160, 0.5), rgba(128, 100, 229, 0.25))' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Geometry & Draw Calls</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>Draw Calls</div>
+              <div style={{ fontSize: 16 }}>{stats.drawCalls}</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>Triangles</div>
+              <div style={{ fontSize: 16 }}>{stats.triangles}</div>
+            </div>
           </div>
-          <LineChart
-            data={[...powerHistRef.current]}
-            height={150}
-            color="#42A5F5"
-            min={0}
-            max={Math.max(150, Math.max(...(powerHistRef.current.length ? powerHistRef.current : [0])))}
-            showAxes={true}
-            yTicks={[0, 50, 100, 150, 200]}
-            xLabels={[{ i: 0, label: 'T-5m' }, { i: Math.floor((powerHistRef.current.length - 1) / 2), label: 'T-2.5m' }, { i: Math.max(0, powerHistRef.current.length - 1), label: 'Now' }]}
-          />
         </div>
 
-        {/* <div style={{ ...cardStyle }}>
+        {/* Trends (energy & CO₂) */}
+        <div style={{ ...cardStyle }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Trends (energy & CO₂)</div>
+          <LineChart data={[...fpsBuf.current].map((_, i) => {
+            const p = fpsBuf.current[i] || 0;
+            return Math.max(5, Math.min(200, p * gridFactorGramsPerWh));
+          })} color="#22D3EE" min={0} max={200} width={680} height={120} />
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Memory</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Used</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)} MB</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Total</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.total / 1048576).toFixed(1)} MB</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>GPU Mem Used</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.used / 1048576).toFixed(1)} MB</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle }}>
           <BarComparison
             title="Energy (Average Power)"
             leftLabel="Baseline"
@@ -245,8 +260,8 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             rightValue={powerOpt}
             unit=" W"
             max={Math.max(powerBase, powerOpt, 1)}
-            colorLeft="#EF5350"
-            colorRight="#66BB6A"
+            colorLeft="#F43F5E"
+            colorRight="#10B981"
           />
           <div style={{ height: 12 }} />
           <BarComparison
@@ -257,10 +272,111 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             rightValue={co2Opt}
             unit=" g"
             max={Math.max(co2Base, co2Opt, 1)}
-            colorLeft="#FFA726"
-            colorRight="#26A69A"
+            colorLeft="#F59E0B"
+            colorRight="#22D3EE"
           />
-        </div> */}
+          <div style={{ height: 12 }} />
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.9 }}>
+            Estimated power with current settings: <strong>{estimatedPower} W</strong>
+          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, opacity: 0.7, marginTop: 4 }}>
+            Theme factor: {themeFactor.toFixed(2)} • Resolution factor: {resolutionFactor.toFixed(2)} • FPS factor: {fpsFactor.toFixed(2)}
+          </div>
+        </div>
+
+        {/* Comparison table */}
+        <div style={{ ...cardStyle }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Rendering Comparison</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Light vs Dark</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>Light</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{Math.round(estimatedPower * 1.1)} W</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>Dark</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{Math.round(estimatedPower * 0.9)} W</div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, opacity: 0.8, marginBottom: 6 }}>Viewport Scale</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 8 }}>
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>100%</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{Math.round(estimatedPower * 1.0)} W</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 10 }}>
+                  <div style={{ fontSize: 11, opacity: 0.8 }}>80%</div>
+                  <div style={{ fontSize: 16, fontWeight: 600 }}>{Math.round(estimatedPower * 0.85)} W</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Energy Breakdown Pie (UI components) */}
+        <div style={{ ...cardStyle }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Energy Breakdown</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, alignItems: 'center' }}>
+            <div style={{
+              width: 180,
+              height: 180,
+              borderRadius: '50%',
+              background: 'conic-gradient(#22D3EE 0 30%, #10B981 30% 65%, #F59E0B 65% 80%, #F43F5E 80% 100%)',
+              margin: '0 auto',
+              position: 'relative'
+            }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'monospace', fontSize: 14 }}>UI</div>
+            </div>
+            <div style={{ display: 'grid', gap: 6, fontFamily: 'monospace', fontSize: 12 }}>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#22D3EE', borderRadius: 2, marginRight: 6 }}></span> Rendering — 30%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#10B981', borderRadius: 2, marginRight: 6 }}></span> Media — 35%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F59E0B', borderRadius: 2, marginRight: 6 }}></span> Networking — 15%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F43F5E', borderRadius: 2, marginRight: 6 }}></span> Other — 20%</div>
+            </div>
+          </div>
+        </div>
+        {/* Right column: Quick Actions & Tips */}
+        <div style={{ display: 'grid', gap: 18 }}>
+          <div style={{ ...cardStyle }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 14, marginBottom: 10, opacity: 0.9 }}>Quick Actions</div>
+            <div style={{ display: 'grid', gap: 10 }}>
+              <button onClick={onApplyOptimizations} style={{
+                background: 'linear-gradient(135deg, #10B981, #059669)',
+                color: '#0b0b0b',
+                border: 'none',
+                padding: '10px 12px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+                fontSize: 13
+              }}>Apply recommended optimizations</button>
+              <button onClick={onExportMetrics} style={{
+                background: 'transparent',
+                color: '#E0F2F1',
+                border: '1px solid rgba(224,242,241,0.25)',
+                padding: '10px 12px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontFamily: 'monospace',
+                fontSize: 13
+              }}>Export metrics (CSV)</button>
+            </div>
+          </div>
+
+          <div style={{ ...cardStyle }}>
+            <div style={{ fontFamily: 'monospace', fontSize: 14, marginBottom: 10, opacity: 0.9 }}>Context & Tips</div>
+            <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6, opacity: 0.85 }}>
+              <li>Use dark mode on OLED to reduce display energy.</li>
+              <li>Prefer WebP/AVIF for images to reduce bytes transferred.</li>
+              <li>Virtualization saves rendering cost for large lists.</li>
+              <li>Lazy-load videos and images; avoid autoplay.</li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -106,27 +106,27 @@ export function StressTestControls({ stressTest, isRunning, onToggle, onIntensit
       position: 'fixed',
       bottom: '10px',
       left: '10px',
-      background: 'rgba(0, 0, 0, 0.8)',
-      color: 'white',
+      background: 'linear-gradient(180deg, rgba(236,253,245,0.9), rgba(209,250,229,0.88))',
+      color: '#073b28',
       padding: '15px',
-      borderRadius: '8px',
+      borderRadius: '12px',
       fontFamily: 'monospace',
       fontSize: '12px',
       zIndex: 1000,
-      border: '1px solid #333',
+      border: '1px solid rgba(16,185,129,0.35)',
       minWidth: '200px'
     }}>
-      <h3 style={{ margin: '0 0 10px 0', fontSize: '14px' }}>GPU Stress Test</h3>
+      <h3 style={{ margin: '0 0 10px 0', fontSize: '14px', color: '#065f46' }}>GPU Stress Test</h3>
       
       <div style={{ marginBottom: '10px' }}>
         <button
           onClick={onToggle}
           style={{
-            background: isRunning ? '#f44336' : '#4CAF50',
-            color: 'white',
+            background: isRunning ? 'linear-gradient(135deg, #f87171, #ef4444)' : 'linear-gradient(135deg, #34d399, #10b981)',
+            color: '#0b0b0b',
             border: 'none',
             padding: '8px 16px',
-            borderRadius: '4px',
+            borderRadius: '8px',
             cursor: 'pointer',
             fontSize: '12px',
             width: '100%'
@@ -148,15 +148,15 @@ export function StressTestControls({ stressTest, isRunning, onToggle, onIntensit
           onChange={handleIntensityChange}
           style={{
             width: '100%',
-            accentColor: '#4CAF50'
+            accentColor: '#10B981'
           }}
         />
-        <div style={{ fontSize: '10px', color: '#ccc', marginTop: '2px' }}>
+        <div style={{ fontSize: '10px', color: '#065f46', marginTop: '2px' }}>
           More objects = Higher GPU load
         </div>
       </div>
 
-      <div style={{ fontSize: '10px', color: '#ccc' }}>
+      <div style={{ fontSize: '10px', color: '#065f46' }}>
         {isRunning ? 'Stress test is running' : 'Click start to stress test GPU'}
       </div>
     </div>

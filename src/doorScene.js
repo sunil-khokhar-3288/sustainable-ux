@@ -1,161 +1,345 @@
-import * as THREE from "three";
-import { GPUMonitor } from "./GPUMonitor";
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GPUMonitor } from './GPUMonitor';  // Ensure implemented or stubbed
 
 export function createDoorScene(mountNode) {
-  // Scene setup
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xffffff);
 
-  // Camera setup
-  const aspect = mountNode.clientWidth / mountNode.clientHeight;
-  const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
-  camera.position.set(0, 0, 3);
-  camera.lookAt(0, 0, 0);
+  const camera = new THREE.PerspectiveCamera(
+    60,
+    mountNode.clientWidth / mountNode.clientHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(0, 1, 3);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "low-power" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-  renderer.setSize(mountNode.clientWidth, mountNode.clientHeight);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'low-power' });
+  // Adaptive resolution params (mutable)
+  let pixelRatioClamp = 1.5; // max device pixel ratio used
+  let viewportScale = 1.0;   // render size factor relative to canvas size
+  const applyRendererSizing = () => {
+    const canvasW = mountNode.clientWidth;
+    const canvasH = mountNode.clientHeight;
+    const renderW = Math.max(1, Math.floor(canvasW * viewportScale));
+    const renderH = Math.max(1, Math.floor(canvasH * viewportScale));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, pixelRatioClamp));
+    renderer.setSize(renderW, renderH, false);
+    // Upscale to fit the container while rendering at lower res
+    renderer.domElement.style.width = canvasW + 'px';
+    renderer.domElement.style.height = canvasH + 'px';
+    renderer.domElement.style.imageRendering = 'pixelated';
+  };
+  applyRendererSizing();
   mountNode.appendChild(renderer.domElement);
 
-  // Initialize GPU Monitor
   const gpuMonitor = new GPUMonitor(renderer);
 
-  // Add a colorful rotating cube
-  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
-  const cubeMaterial = new THREE.MeshNormalMaterial();
-  const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
-  scene.add(cube);
-
-  // Lights
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-  scene.add(ambientLight);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-  directionalLight.position.set(0, 5, 5);
+  directionalLight.position.set(5, 5, 5);
+  scene.add(ambientLight);
   scene.add(directionalLight);
 
-  // No mouse interaction needed
+  const loader = new GLTFLoader();
+  let model = null;
+  let isModelLoaded = false;
 
-  // Animation loop (static door)
-  let frameId;
-  let timeoutId;
-  let worker;
-  let isPaused = false;
-  let targetFps = 30; // default optimized
+  loader.load(
+    '/models/car.glb',  // Ensure model is in /public/models/car_model.glb
+    (gltf) => {
+      model = gltf.scene;
+      model.scale.set(0.5, 0.5, 0.5);
+      model.position.set(0, 0, 0);
+      scene.add(model);
+      isModelLoaded = true;
+    },
+    undefined,
+    (error) => console.error('Model load error:', error)
+  );
+
+  // Minimal overlay for current settings (metrics live in dashboard)
+  const overlay = document.createElement('div');
+  overlay.style.position = 'absolute';
+  overlay.style.top = '10px';
+  overlay.style.left = '10px';
+  overlay.style.background = 'rgba(255,255,255,0.85)';
+  overlay.style.padding = '8px 10px';
+  overlay.style.borderRadius = '12px';
+  overlay.style.fontFamily = 'Arial, sans-serif';
+  overlay.style.fontSize = '12px';
+  overlay.style.color = '#333';
+  overlay.style.zIndex = '10';
+  overlay.style.boxShadow = '0 10px 20px rgba(0,0,0,0.2)';
+  overlay.style.border = '1px solid rgba(0,0,0,0.1)';
+  mountNode.style.position = 'relative';
+  const updateOverlayText = () => {
+    const content = document.createElement('div');
+    content.textContent = `Resolution: PR≤${pixelRatioClamp.toFixed(2)} • Viewport ${(viewportScale*100).toFixed(0)}%`;
+    const row = document.createElement('div');
+    row.style.display = 'flex';
+    row.style.alignItems = 'center';
+    row.style.gap = '8px';
+    const title = document.createElement('strong');
+    title.textContent = 'Scene Settings';
+    title.style.fontSize = '12px';
+    row.appendChild(title);
+    overlay.innerHTML = '';
+    overlay.appendChild(row);
+    overlay.appendChild(content);
+  };
+  updateOverlayText();
+  mountNode.appendChild(overlay);
+
+  // Collapsible overlay handle
+  let overlayCollapsed = false;
+  const collapseBtn = document.createElement('button');
+  collapseBtn.textContent = '−';
+  collapseBtn.style.background = 'transparent';
+  collapseBtn.style.border = 'none';
+  collapseBtn.style.cursor = 'pointer';
+  collapseBtn.style.fontSize = '14px';
+  collapseBtn.style.marginLeft = '6px';
+  collapseBtn.title = 'Collapse';
+  overlay.firstChild && overlay.firstChild.appendChild(collapseBtn);
+  const collapsedPill = document.createElement('button');
+  collapsedPill.textContent = 'Scene Settings';
+  collapsedPill.style.position = 'absolute';
+  collapsedPill.style.top = '10px';
+  collapsedPill.style.left = '10px';
+  collapsedPill.style.padding = '6px 10px';
+  collapsedPill.style.borderRadius = '999px';
+  collapsedPill.style.border = '1px solid rgba(0,0,0,0.15)';
+  collapsedPill.style.background = 'rgba(255,255,255,0.9)';
+  collapsedPill.style.fontFamily = 'Arial, sans-serif';
+  collapsedPill.style.fontSize = '12px';
+  collapsedPill.style.cursor = 'pointer';
+  collapsedPill.style.boxShadow = '0 8px 16px rgba(0,0,0,0.15)';
+  collapsedPill.style.display = 'none';
+  collapsedPill.style.zIndex = '11';
+  collapsedPill.addEventListener('click', () => {
+    overlayCollapsed = false;
+    overlay.style.display = 'block';
+    collapsedPill.style.display = 'none';
+  });
+  mountNode.appendChild(collapsedPill);
+  collapseBtn.addEventListener('click', () => {
+    overlayCollapsed = !overlayCollapsed;
+    if (overlayCollapsed) {
+      overlay.style.display = 'none';
+      collapsedPill.style.display = 'inline-block';
+    } else {
+      overlay.style.display = 'block';
+      collapsedPill.style.display = 'none';
+    }
+  });
+
+  // Interaction variables
+  let isDragging = false;
+  let prevX = 0;
+  let prevY = 0;
+
+  function onPointerDown(e) {
+    isDragging = true;
+    prevX = e.clientX;
+    prevY = e.clientY;
+  }
+
+  function onPointerMove(e) {
+    if (!isDragging || !isModelLoaded) return;
+
+    const deltaX = e.clientX - prevX;
+    const deltaY = e.clientY - prevY;
+
+    model.rotation.y += deltaX * 0.005;
+    model.rotation.x += deltaY * 0.005;
+
+    // Clamp vertical rotation to prevent flipping
+    model.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, model.rotation.x));
+
+    prevX = e.clientX;
+    prevY = e.clientY;
+  }
+
+  function onPointerUp() {
+    isDragging = false;
+  }
+
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  renderer.domElement.addEventListener('pointermove', onPointerMove);
+  renderer.domElement.addEventListener('pointerup', onPointerUp);
+  renderer.domElement.addEventListener('pointerleave', onPointerUp);
+
+  // Render cadence control
+  let targetFps = 30;                 // foreground FPS target
+  let backgroundFps = 5;              // when tab/page is hidden
   let frameIntervalMs = 1000 / targetFps;
   let lastRenderTime = 0;
-  let pauseOnHidden = true; // default optimized behavior
+  let isHidden = typeof document !== 'undefined' ? document.hidden : false;
+  // Smooth recovery state
+  let rampStartMs = 0;
+  let rampDurationMs = 900;
 
-  const animate = (now) => {
-    if (isPaused) {
-      frameId = requestAnimationFrame(animate);
-      return;
-    }
+  function getEffectiveIntervalMs(now) {
+    const hiddenInterval = 1000 / Math.max(1, backgroundFps);
+    const visibleInterval = frameIntervalMs;
+    if (isHidden) return hiddenInterval;
+    // If we just became visible, ramp from hiddenInterval to visibleInterval
+    const t = rampStartMs ? Math.min(1, (now - rampStartMs) / rampDurationMs) : 1;
+    const eased = t < 1 ? (t*t*(3 - 2*t)) : 1; // smoothstep easing
+    const eff = hiddenInterval + (visibleInterval - hiddenInterval) * eased;
+    return eff;
+  }
+
+  function animate(now) {
     if (!lastRenderTime) lastRenderTime = now;
     const elapsed = now - lastRenderTime;
-    if (elapsed >= frameIntervalMs) {
-      // Rotate the cube for a simple animation
-      cube.rotation.x += 0.01;
-      cube.rotation.y += 0.015;
+    const effInterval = getEffectiveIntervalMs(now);
+    if (elapsed >= effInterval) {
       renderer.render(scene, camera);
-      // feed GPU monitor with actual render cadence
       if (gpuMonitor && typeof gpuMonitor.onFrameRendered === 'function') {
         gpuMonitor.onFrameRendered(now);
       }
       lastRenderTime = now;
     }
-    if (document.hidden && !pauseOnHidden) {
-      // When hidden in baseline, rely on worker ticks to drive rendering
-      // (set up in visibility handler). Do not schedule RAF here to avoid extra work.
-      return;
-    }
-    frameId = requestAnimationFrame(animate);
-  };
-  frameId = requestAnimationFrame(animate);
+    requestAnimationFrame(animate);
+  }
 
-  // Allow switching between baseline and optimized modes to demo utilization difference
+  requestAnimationFrame(animate);
+
   function setPerformanceMode(mode) {
-    if (mode === "baseline") {
+    if (mode === 'baseline') {
       targetFps = 60;
       frameIntervalMs = 1000 / targetFps;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
-      renderer.setSize(mountNode.clientWidth, mountNode.clientHeight);
-      pauseOnHidden = false;
-      // If previously paused only due to hidden, resume
-      if (document.hidden) {
-        isPaused = false;
-      }
+      pixelRatioClamp = 3;
     } else {
       targetFps = 30;
       frameIntervalMs = 1000 / targetFps;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-      renderer.setSize(mountNode.clientWidth, mountNode.clientHeight);
-      pauseOnHidden = true;
-      if (document.hidden) {
-        isPaused = true;
-      }
+      pixelRatioClamp = 1.5;
     }
+    applyRendererSizing();
   }
 
-  // Handle resize
-  function handleResize() {
+  function setTargetFps(nextFps) {
+    targetFps = Math.max(1, Math.min(120, nextFps || 30));
+    frameIntervalMs = 1000 / targetFps;
+  }
+
+  function setBackgroundFps(nextFps) {
+    backgroundFps = Math.max(1, Math.min(30, nextFps || 5));
+  }
+
+  function setPixelRatioClampValue(nextClamp) {
+    pixelRatioClamp = Math.max(0.5, Math.min(3, nextClamp || 1.5));
+    applyRendererSizing();
+    updateOverlayText();
+  }
+
+  function setViewportScaleValue(nextScale) {
+    viewportScale = Math.max(0.3, Math.min(1, nextScale || 1));
+    applyRendererSizing();
+    updateOverlayText();
+  }
+
+  // Sustainable themes: light, dark, eink, high-contrast
+  let currentTheme = 'light';
+  function setTheme(theme) {
+    currentTheme = theme;
+    if (theme === 'dark') {
+      scene.background = new THREE.Color(0x0b0b0b);
+      ambientLight.intensity = 0.35;
+      directionalLight.intensity = 0.6;
+    } else if (theme === 'eink') {
+      scene.background = new THREE.Color(0xf2f2f2);
+      ambientLight.intensity = 0.25;
+      directionalLight.intensity = 0.4;
+      // Force materials to grayscale
+      scene.traverse((obj) => {
+        if (obj.isMesh && obj.material) {
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach(m => { m.color = new THREE.Color(0x222222); m.metalness = 0; m.roughness = 1; });
+          } else {
+            obj.material.color = new THREE.Color(0x222222);
+            if ('metalness' in obj.material) obj.material.metalness = 0;
+            if ('roughness' in obj.material) obj.material.roughness = 1;
+          }
+        }
+      });
+    } else if (theme === 'high-contrast') {
+      scene.background = new THREE.Color(0x000000);
+      ambientLight.intensity = 0.2;
+      directionalLight.intensity = 1.2;
+      directionalLight.color = new THREE.Color(0xffffff);
+    } else { // light
+      scene.background = new THREE.Color(0xffffff);
+      ambientLight.intensity = 0.7;
+      directionalLight.intensity = 1.0;
+    }
+    // Overlay styling according to theme brightness
+    overlay.style.background = (theme === 'dark' || theme === 'high-contrast') ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)';
+    overlay.style.color = (theme === 'dark' || theme === 'high-contrast') ? '#fff' : '#333';
+  }
+
+  window.addEventListener('resize', () => {
     camera.aspect = mountNode.clientWidth / mountNode.clientHeight;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    renderer.setSize(mountNode.clientWidth, mountNode.clientHeight);
-  }
-  window.addEventListener("resize", handleResize);
+    applyRendererSizing();
+  });
 
-  // Pause rendering when tab is hidden to save resources
-  function handleVisibilityChange() {
-    isPaused = pauseOnHidden && document.hidden;
-    if (!pauseOnHidden) {
-      // Baseline: start/stop worker ticks based on visibility
-      if (document.hidden) {
-        try {
-          if (!worker) {
-            worker = new Worker(new URL('./renderTicker.worker.js', import.meta.url));
-            worker.onmessage = (e) => {
-              if (e.data && e.data.type === 'tick' && !isPaused) {
-                const now = e.data.now || performance.now();
-                animate(now);
-              }
-            };
-          }
-          worker.postMessage({ type: 'start', fps: targetFps });
-        } catch (err) {
-          // Fallback to setTimeout if worker creation fails
-          const delay = Math.max(0, frameIntervalMs - (performance.now() - lastRenderTime));
-          timeoutId = setTimeout(() => animate(performance.now()), delay);
-        }
-      } else {
-        if (worker) {
-          worker.postMessage({ type: 'stop' });
-        }
-        if (timeoutId) clearTimeout(timeoutId);
-        frameId = requestAnimationFrame(animate);
-      }
+  document.addEventListener('visibilitychange', () => {
+    const wasHidden = isHidden;
+    isHidden = document.hidden;
+    if (!isHidden && wasHidden) {
+      rampStartMs = performance.now();
     }
-  }
-  document.addEventListener("visibilitychange", handleVisibilityChange);
+  });
 
   function cleanup() {
-    cancelAnimationFrame(frameId);
-    if (timeoutId) clearTimeout(timeoutId);
-    if (worker) {
-      try { worker.terminate(); } catch (_) {}
-      worker = null;
+    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+    renderer.domElement.removeEventListener('pointermove', onPointerMove);
+    renderer.domElement.removeEventListener('pointerup', onPointerUp);
+    renderer.domElement.removeEventListener('pointerleave', onPointerUp);
+
+    if (model) {
+      model.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      });
     }
-    window.removeEventListener("resize", handleResize);
-    document.removeEventListener("visibilitychange", handleVisibilityChange);
-    cubeGeometry.dispose();
-    // MeshNormalMaterial does not allocate textures; dispose anyway for consistency
-    cubeMaterial.dispose();
+
     gpuMonitor.destroy();
     renderer.dispose();
+
     if (mountNode) {
       mountNode.removeChild(renderer.domElement);
     }
+    if (overlay && overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
   }
 
-  return { cleanup, gpuMonitor, scene, renderer, setPerformanceMode };
+  function getCurrentSettings() {
+    return {
+      targetFps,
+      backgroundFps,
+      pixelRatioClamp,
+      viewportScale,
+      theme: currentTheme
+    };
+  }
+
+  return {
+    cleanup,
+    gpuMonitor,
+    scene,
+    renderer,
+    setPerformanceMode,
+    setTargetFps,
+    setBackgroundFps,
+    setPixelRatioClamp: setPixelRatioClampValue,
+    setViewportScale: setViewportScaleValue,
+    setTheme,
+    getCurrentSettings,
+    currentTheme
+  };
 }

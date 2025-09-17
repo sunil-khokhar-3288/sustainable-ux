@@ -42,17 +42,18 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
   return (
     <div style={{
       position: 'fixed',
-      top: '50px',
-      left: '10px',
-      background: 'rgba(0, 0, 0, 0.8)',
-      color: 'white',
-      padding: '10px',
-      borderRadius: '8px',
+      top: '0px',
+      right: '10px',
+      background: 'linear-gradient(180deg, rgba(236, 253, 245, 0.85), rgba(209, 250, 229, 0.8))',
+      color: '#073b28',
+      padding: '12px',
+      borderRadius: '12px',
       fontFamily: 'monospace',
       fontSize: '11px',
       minWidth: hasComparison ? '160px' : '200px',
       zIndex: 1000,
-      border: '1px solid #333'
+      border: '1px solid rgba(16,185,129,0.35)',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
     }}>
       <div style={{
         display: 'flex',
@@ -60,13 +61,15 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
         alignItems: 'center',
         marginBottom: '6px'
       }}>
-        <h3 style={{ margin: 0, fontSize: '13px' }}>GPU Monitor</h3>
+        <h3 style={{ margin: 0, fontSize: '13px', color: '#065f46' }}>GPU Monitor</h3>
         <button
           onClick={() => setIsVisible(false)}
           style={{
-            background: 'none',
-            border: 'none',
-            color: 'white',
+            background: 'transparent',
+            border: '1px solid rgba(16,185,129,0.35)',
+            color: '#065f46',
+            borderRadius: 6,
+            padding: '2px 6px',
             cursor: 'pointer',
             fontSize: '16px'
           }}
@@ -75,10 +78,10 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
         </button>
       </div>
       
-      <div style={{ marginBottom: '6px' }}>
+      <div style={{ marginBottom: '6px', color: '#064e3b' }}>
         <strong>Performance:</strong>
         <div style={{ marginLeft: '8px' }}>
-          <div>FPS: <span style={{ color: '#00ff00' }}>{stats.fps.toFixed(1)}</span></div>
+          <div>FPS: <span style={{ color: '#0ea5e9' }}>{stats.fps.toFixed(1)}</span></div>
           <div>Frame Time: {stats.frameTime.toFixed(2)}ms</div>
         </div>
       </div>
@@ -91,19 +94,19 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
 
       {mode === 'baseline' && isHidden && (
         <div style={{
-          background: '#665c00',
-          color: '#ffeb3b',
+          background: 'rgba(253, 230, 138, 0.8)',
+          color: '#78350f',
           padding: '4px 6px',
           borderRadius: '4px',
           marginBottom: '6px',
-          border: '1px solid #857a00'
+          border: '1px solid rgba(251,191,36,0.8)'
         }}>
           Background rendering may be throttled by the browser when hidden.
         </div>
       )}
 
-      {/* {optimizationInfo && (
-        <div style={{ marginBottom: '8px' }}>
+      {optimizationInfo && (
+        <div style={{ marginBottom: '8px', color: '#064e3b' }}>
           <strong>Optimizations ({mode === 'optimized' ? 'Optimized' : 'Baseline'}):</strong>
           <div style={{ marginLeft: '10px' }}>
             <div>FPS Cap: {optimizationInfo.fpsCap} FPS</div>
@@ -113,10 +116,10 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
             <div>Pause on Hidden: {optimizationInfo.pauseOnHidden ? 'Yes' : 'No'}</div>
           </div>
         </div>
-      )} */}
+      )}
       
       <div style={{ marginBottom: '6px' }}>
-        <strong>GPU Utilization:</strong>
+        <strong style={{ color: '#064e3b' }}>GPU Utilization:</strong>
         <div style={{ marginLeft: '8px' }}>
           <div style={{ 
             color: getUtilizationColor(stats.gpu.utilization),
@@ -127,10 +130,10 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
           <div style={{ 
             width: '100%', 
             height: '6px', 
-            background: '#333', 
+            background: 'rgba(16,185,129,0.2)', 
             borderRadius: '4px',
             overflow: 'hidden',
-            marginTop: '10px'
+            marginTop: '2px'
           }}>
             <div style={{
               width: `${stats.gpu.utilization}%`,
@@ -143,7 +146,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
       </div>
       
       <div style={{ marginBottom: '6px' }}>
-        <strong>GPU Temperature:</strong>
+        <strong style={{ color: '#064e3b' }}>GPU Temperature:</strong>
         <div style={{ 
           marginLeft: '8px',
           color: getTemperatureColor(stats.gpu.temperature),
@@ -154,7 +157,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
       </div>
       
       <div style={{ marginBottom: '0' }}>
-        <strong>GPU Power:</strong>
+        <strong style={{ color: '#064e3b' }}>GPU Power:</strong>
         <div style={{ marginLeft: '8px' }}>
           ~{stats.gpu.power}W
         </div>

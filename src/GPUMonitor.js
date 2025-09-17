@@ -204,7 +204,9 @@ export class GPUMonitor {
     // Power estimate scaled with utilization
     const baseWatts = 15;
     const dynamicWatts = 60; // headroom
-    this.stats.gpu.power = Math.round(baseWatts + dynamicWatts * (utilization / 100));
+    const darkThemeWatts = this.currentTheme === 'dark' ? 5 : 0;
+    console.log(this.stats);
+    this.stats.gpu.power = Math.round((baseWatts + dynamicWatts - darkThemeWatts) * (utilization / 100));
   }
   
   getStats() {

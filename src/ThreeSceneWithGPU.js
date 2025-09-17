@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState } from 'react';
-import ReactDOM from 'react-dom/client';
 import { createDoorScene } from './doorScene';
 import { GPUStatsDisplay, GPUStatsToggle } from './GPUStatsDisplay';
 import { GPUStressTest, StressTestControls } from './GPUStressTest';
@@ -13,6 +12,11 @@ export default function ThreeSceneWithGPU() {
   const [showStats, setShowStats] = useState(true);
   const [isStressTestRunning, setIsStressTestRunning] = useState(false);
   const [mode, setMode] = useState('optimized');
+  const [theme, setTheme] = useState('dark');
+  const [pixelRatioClamp, setPixelRatioClamp] = useState(1.5);
+  const [viewportScale, setViewportScale] = useState(1.0);
+  const [targetFps, setTargetFps] = useState(30);
+  const [backgroundFps, setBackgroundFps] = useState(5);
   const getOptimizationInfo = () => {
     return mode === 'optimized' ? {
       fpsCap: 30,
@@ -33,15 +37,13 @@ export default function ThreeSceneWithGPU() {
   const [baselinePowerAvg, setBaselinePowerAvg] = useState(null);
   const [optimizedPowerAvg, setOptimizedPowerAvg] = useState(null);
   const [showDashboard, setShowDashboard] = useState(true);
-  const dashboardPopupRef = useRef(null);
-  const dashboardRootRef = useRef(null);
 
   useEffect(() => {
     if (!mountRef.current) return;
 
     // Create the Three.js scene
-    const { cleanup, gpuMonitor: monitor, scene, renderer, setPerformanceMode } = createDoorScene(mountRef.current);
-    sceneRef.current = { cleanup, scene, renderer, setPerformanceMode };
+    const { cleanup, gpuMonitor: monitor, scene, renderer, setPerformanceMode, setTargetFps: setTfps, setBackgroundFps: setBfps, setPixelRatioClamp, setViewportScale, setTheme: setSceneTheme, getCurrentSettings, currentTheme } = createDoorScene(mountRef.current);
+    sceneRef.current = { cleanup, scene, renderer, setPerformanceMode, setTfps, setBfps, setPixelRatioClamp, setViewportScale, setSceneTheme, getCurrentSettings };
     setGpuMonitor(monitor);
     
     // Initialize stress test
@@ -81,57 +83,31 @@ export default function ThreeSceneWithGPU() {
     setMode(next);
   };
 
-  const openDashboardPopup = () => {
-    if (!gpuMonitor) return;
-    if (dashboardPopupRef.current && !dashboardPopupRef.current.closed) {
-      dashboardPopupRef.current.focus();
-      return;
-    }
-    const popup = window.open('', 'gpu_dashboard', 'width=900,height=720,resizable=yes');
-    if (!popup) return;
-    popup.document.title = 'GPU Dashboard';
-    popup.document.body.style.margin = '0';
-    popup.document.body.style.background = '#ffffff';
-    popup.document.body.style.display = 'block';
-    popup.document.body.style.width = '100%';
-    const container = popup.document.createElement('div');
-    container.id = 'dashboard-root';
-    container.style.maxWidth = '900px';
-    container.style.margin = '20px auto';
-    container.style.display = 'block';
-    popup.document.body.appendChild(container);
-    const root = ReactDOM.createRoot(container);
-    root.render(
-      React.createElement(GPUDashboard, {
-        gpuMonitor,
-        baselinePowerAvg,
-        optimizedPowerAvg
-      })
-    );
-    dashboardPopupRef.current = popup;
-    dashboardRootRef.current = root;
-    popup.addEventListener('beforeunload', () => {
-      try { dashboardRootRef.current && dashboardRootRef.current.unmount(); } catch (_) {}
-      dashboardRootRef.current = null;
-      dashboardPopupRef.current = null;
-      setShowDashboard(false);
-    });
-  };
+  // Sync scene controls when local states change
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setSceneTheme?.(theme);
+  }, [theme]);
 
   useEffect(() => {
-    return () => {
-      if (dashboardRootRef.current) {
-        try { dashboardRootRef.current.unmount(); } catch (_) {}
-        dashboardRootRef.current = null;
-      }
-      if (dashboardPopupRef.current && !dashboardPopupRef.current.closed) {
-        try { dashboardPopupRef.current.close(); } catch (_) {}
-        dashboardPopupRef.current = null;
-      }
-    };
-  }, []);
+    if (!sceneRef.current) return;
+    sceneRef.current.setTfps?.(targetFps);
+  }, [targetFps]);
 
-  
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setBfps?.(backgroundFps);
+  }, [backgroundFps]);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setPixelRatioClamp?.(pixelRatioClamp);
+  }, [pixelRatioClamp]);
+
+  useEffect(() => {
+    if (!sceneRef.current) return;
+    sceneRef.current.setViewportScale?.(viewportScale);
+  }, [viewportScale]);
 
   // Measure averages over a window
   const measureAverages = (windowMs = 2000) => new Promise((resolve) => {
@@ -172,88 +148,31 @@ export default function ThreeSceneWithGPU() {
     setMode('optimized');
   };
 
-  // Auto-adjust FPS based on system power-saving hints (with fallbacks)
-  // useEffect(() => {
-  //   let cleanupFns = [];
-  //   let battery = null;
-
-  //   const applyPowerMode = (shouldSave) => {
-  //     if (!sceneRef.current) return;
-  //     const targetMode = shouldSave ? 'optimized' : 'baseline';
-  //     if (targetMode !== mode) {
-  //       sceneRef.current.setPerformanceMode(targetMode);
-  //       setMode(targetMode);
-  //     }
-  //   };
-
-  //   const computeShouldSave = ({ saveData, reducedMotion, batteryInfo }) => {
-  //     if (saveData) return true;
-  //     if (reducedMotion) return true;
-  //     if (batteryInfo) {
-  //       const { charging, level } = batteryInfo;
-  //       if (level !== undefined && charging !== undefined) {
-  //         return !charging && level <= 0.2;
-  //       }
-  //     }
-  //     return false;
-  //   };
-
-  //   const evaluate = () => {
-  //     const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  //     const saveData = !!(conn && typeof conn.saveData === 'boolean' && conn.saveData);
-  //     const mql = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  //     const reducedMotion = !!(mql && mql.matches);
-  //     const batteryInfo = battery ? { charging: battery.charging, level: battery.level } : null;
-  //     const shouldSave = computeShouldSave({ saveData, reducedMotion, batteryInfo });
-  //     applyPowerMode(shouldSave);
-  //   };
-
-  //   // Network save-data
-  //   const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  //   if (conn && 'onchange' in conn) {
-  //     const onConn = () => evaluate();
-  //     conn.addEventListener('change', onConn);
-  //     cleanupFns.push(() => conn.removeEventListener('change', onConn));
-  //   }
-
-  //   // prefers-reduced-motion
-  //   const mql = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
-  //   if (mql && 'addEventListener' in mql) {
-  //     const onMql = () => evaluate();
-  //     mql.addEventListener('change', onMql);
-  //     cleanupFns.push(() => mql.removeEventListener('change', onMql));
-  //   }
-
-  //   // Battery API (not available on many desktops; try/catch)
-  //   (async () => {
-  //     try {
-  //       if (navigator.getBattery) {
-  //         battery = await navigator.getBattery();
-  //         const onBattery = () => evaluate();
-  //         battery.addEventListener('levelchange', onBattery);
-  //         battery.addEventListener('chargingchange', onBattery);
-  //         cleanupFns.push(() => {
-  //           battery && battery.removeEventListener('levelchange', onBattery);
-  //           battery && battery.removeEventListener('chargingchange', onBattery);
-  //         });
-  //       }
-  //     } catch (err) {
-  //       // Battery API not supported; rely on other signals
-  //     } finally {
-  //       evaluate();
-  //     }
-  //   })();
-
-  //   return () => {
-  //     cleanupFns.forEach(fn => { try { fn(); } catch (_) {} });
-  //     cleanupFns = [];
-  //   };
-  // }, [mode]);
-
   return (
     <div style={{ width: '100%', height: '100%', position: 'relative' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
       <GPUStatsToggle onToggle={setShowStats} />
+      {/* Floating Dashboard Open Button */}
+      <button
+        onClick={() => setShowDashboard(true)}
+        style={{
+          position: 'fixed',
+          right: '16px',
+          bottom: '16px',
+          background: 'linear-gradient(135deg,rgb(238, 245, 241),rgb(231, 241, 224))',
+          color: '#0b0b0b',
+          border: 'none',
+          padding: '12px 16px',
+          borderRadius: '999px',
+          cursor: 'pointer',
+          fontFamily: 'monospace',
+          fontSize: '13px',
+          zIndex: 1100,
+          boxShadow: '0 12px 24px rgba(0,0,0,0.35)'
+        }}
+      >
+        Open Sustainability Dashboard
+      </button>
       {showStats && gpuMonitor && (
         <GPUStatsDisplay 
           gpuMonitor={gpuMonitor}
@@ -264,32 +183,46 @@ export default function ThreeSceneWithGPU() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                 <button onClick={toggleMode} style={{ padding: '6px 10px' }}>
-                  Mode: {mode === 'optimized' ? 'Energy Saver' : 'Baseline'}
+                  Mode: {mode === 'optimized' ? 'Optimized' : 'Baseline'}
                 </button>
                 <button onClick={runComparison} style={{ padding: '6px 10px' }}>
                   Compare (2s each)
                 </button>
-                <button onClick={() => {
-                  if (dashboardPopupRef.current && !dashboardPopupRef.current.closed) {
-                    try { dashboardPopupRef.current.close(); } catch (_) {}
-                    dashboardPopupRef.current = null;
-                    if (dashboardRootRef.current) {
-                      try { dashboardRootRef.current.unmount(); } catch (_) {}
-                      dashboardRootRef.current = null;
-                    }
-                    setShowDashboard(false);
-                  } else {
-                    openDashboardPopup();
-                    setShowDashboard(true);
-                  }
-                }} style={{ padding: '6px 10px' }}>
-                  {dashboardPopupRef.current && !dashboardPopupRef.current?.closed ? 'Hide' : 'Show'} Dashboard
+                <button onClick={() => setShowDashboard(v => !v)} style={{ padding: '6px 10px' }}>
+                  {showDashboard ? 'Hide' : 'Show'} Dashboard
                 </button>
                 {(baselineAvg !== null || optimizedAvg !== null) && (
                   <div style={{ fontSize: '11px' }}>
                     Baseline: {baselineAvg ?? '-'}% | Optimized: {optimizedAvg ?? '-'}%
                   </div>
                 )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11 }}>Theme</label>
+                  <select value={theme} onChange={(e) => setTheme(e.target.value)} style={{ padding: '4px 6px', fontSize: 12 }}>
+                    <option value="dark">Dark (energy-friendly)</option>
+                    <option value="light">Light</option>
+                    <option value="eink">E-Ink (grayscale)</option>
+                    <option value="high-contrast">High Contrast</option>
+                  </select>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11 }}>Target FPS: {targetFps}</label>
+                  <input type="range" min="15" max="60" value={targetFps} onChange={(e) => setTargetFps(parseInt(e.target.value))} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11 }}>Background FPS: {backgroundFps}</label>
+                  <input type="range" min="1" max="15" value={backgroundFps} onChange={(e) => setBackgroundFps(parseInt(e.target.value))} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11 }}>Pixel Ratio Clamp: {pixelRatioClamp.toFixed(2)}</label>
+                  <input type="range" min="0.5" max="3" step="0.1" value={pixelRatioClamp} onChange={(e) => setPixelRatioClamp(parseFloat(e.target.value))} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <label style={{ fontSize: 11 }}>Viewport Scale: {(viewportScale * 100).toFixed(0)}%</label>
+                  <input type="range" min="0.3" max="1" step="0.05" value={viewportScale} onChange={(e) => setViewportScale(parseFloat(e.target.value))} />
+                </div>
               </div>
               {(baselinePowerAvg !== null && optimizedPowerAvg !== null) && (
                 (() => {
@@ -308,7 +241,92 @@ export default function ThreeSceneWithGPU() {
           }
         />
       )}
-      {/* Dashboard is rendered into popup window when opened */}
+      {/* Modal-style overlay Dashboard */}
+      {showDashboard && gpuMonitor && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(6,10,12,0.8)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 1200,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 0
+        }}>
+          <div style={{
+            position: 'relative',
+            width: '100vw',
+            height: '100vh',
+            overflow: 'auto',
+            background: 'linear-gradient(180deg,rgb(75, 160, 106), #0a0d0f)',
+            borderTop: '1px solid rgba(255,255,255,0.06)'
+          }}>
+            <div style={{ top: 0, zIndex: 1, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 18px', gap: 12 }}>
+                <div style={{ fontFamily: 'monospace', fontSize: 24, color: 'orange', fontWeight: 700 }}>Sustainability UX Dashboard</div>
+                <div style={{ position: 'absolute', right: 18 }}>
+                  <button onClick={() => setShowDashboard(false)} style={{
+                    background: 'rgba(249, 247, 247, 0.25)',
+                    color: 'rgba(245, 9, 9, 0.25)',
+                    border: '1px solid rgba(230, 12, 12, 0.25)',
+                    borderRadius: 10,
+                    padding: '8px 12px',
+                    cursor: 'pointer'
+                  }}>Close</button>
+                </div>
+              </div>
+            </div>
+            <GPUDashboard 
+              inModal
+              gpuMonitor={gpuMonitor}
+              baselinePowerAvg={baselinePowerAvg}
+              optimizedPowerAvg={optimizedPowerAvg}
+              settings={{ theme, pixelRatioClamp, viewportScale, targetFps, backgroundFps }}
+              onApplyOptimizations={() => {
+                // Opinionated optimized preset
+                setTheme('dark');
+                setTargetFps(30);
+                setBackgroundFps(5);
+                setPixelRatioClamp(1.2);
+                setViewportScale(0.8);
+                if (sceneRef.current) {
+                  sceneRef.current.setPerformanceMode('optimized');
+                }
+              }}
+              onExportMetrics={() => {
+                if (!gpuMonitor) return;
+                const s = gpuMonitor.getStats();
+                const csv = [
+                  'metric,value',
+                  `fps,${s.fps.toFixed(2)}`,
+                  `frameTimeMs,${s.frameTime.toFixed(2)}`,
+                  `gpuUtilizationPct,${s.gpu.utilization}`,
+                  `gpuPowerW,${s.gpu.power}`,
+                  `gpuTempC,${s.gpu.temperature?.toFixed(1)}`,
+                  `drawCalls,${s.drawCalls}`,
+                  `triangles,${s.triangles}`,
+                  `textures,${s.textures}`,
+                  `pixelRatioClamp,${pixelRatioClamp}`,
+                  `viewportScale,${viewportScale}`,
+                  `targetFps,${targetFps}`,
+                  `backgroundFps,${backgroundFps}`,
+                  `theme,${theme}`
+                ].join('\n');
+                const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'sustainability-metrics.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+              }}
+            />
+          </div>
+        </div>
+      )}
       <StressTestControls 
         stressTest={stressTest}
         isRunning={isStressTestRunning}
