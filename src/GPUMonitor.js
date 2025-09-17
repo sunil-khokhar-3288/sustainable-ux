@@ -4,6 +4,14 @@ export class GPUMonitor {
   constructor(renderer) {
     this.renderer = renderer;
     this.gl = renderer.getContext();
+    this.currentTheme = 'light';
+    this.themeBaselineWatts = {
+      light: 14,
+      dark: 9,
+      'high-contrast': 11,
+      eink: 7,
+      oled: 6
+    };
     this.stats = {
       fps: 0,
       frameTime: 0,
@@ -47,6 +55,10 @@ export class GPUMonitor {
     
     // Start monitoring
     this.startMonitoring();
+  }
+
+  setTheme(theme) {
+    this.currentTheme = theme || 'light';
   }
   
   initWebGLExtensions() {
@@ -201,12 +213,10 @@ export class GPUMonitor {
     const tempSpan = 35; // range up to ~75C
     this.stats.gpu.temperature = baseTemp + (tempSpan * (utilization / 100));
 
-    // Power estimate scaled with utilization
-    const baseWatts = 15;
-    const dynamicWatts = 60; // headroom
-    const darkThemeWatts = this.currentTheme === 'dark' ? 5 : 0;
-    console.log(this.stats);
-    this.stats.gpu.power = Math.round((baseWatts + dynamicWatts - darkThemeWatts) * (utilization / 100));
+    // Power estimate: theme baseline + dynamic component scaled by utilization
+    const themeBase = this.themeBaselineWatts[this.currentTheme] ?? 10;
+    const dynamicWatts = 70; // headroom for load-dependent power
+    this.stats.gpu.power = Math.round(themeBase + dynamicWatts * (utilization / 100));
   }
   
   getStats() {

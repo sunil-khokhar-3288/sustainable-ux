@@ -1,0 +1,1 @@
+{"version":3,"file":"static/css/main.64178ba6.css","mappings":"AAAA,KAAoC,kBAAmB,CAAE,aAAc,CAAhE,QAAS,CAAE,eAAuD,CACzE,oBAAwB,qBAAwB","sources":["index.css"],"sourcesContent":["body { margin: 0; overflow: hidden; background: #0a0a0a; color: #eaeaea; }\r\nbutton, select, input { font-family: monospace; }"],"names":[],"sourceRoot":""}

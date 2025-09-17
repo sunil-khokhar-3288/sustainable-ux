@@ -1,11 +1,11 @@
 import React, { useEffect, useRef } from "react";
-import { createDoorScene } from "./doorScene";
+import { createModelScene } from "./ThreeDModelScene";
 
 export default function ThreeScene() {
   const mountRef = useRef(null);
 
   useEffect(() => {
-    const { cleanup } = createDoorScene(mountRef.current);
+    const { cleanup } = createModelScene(mountRef.current);
     return () => cleanup();
   }, []);
 

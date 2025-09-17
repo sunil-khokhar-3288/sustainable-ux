@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createDoorScene } from './doorScene';
+import { createModelScene } from './ThreeDModelScene';
 import { GPUStatsDisplay, GPUStatsToggle } from './GPUStatsDisplay';
 import { GPUStressTest, StressTestControls } from './GPUStressTest';
 import GPUDashboard from './GPUDashboard';
@@ -12,7 +12,7 @@ export default function ThreeSceneWithGPU() {
   const [showStats, setShowStats] = useState(true);
   const [isStressTestRunning, setIsStressTestRunning] = useState(false);
   const [mode, setMode] = useState('optimized');
-  const [theme, setTheme] = useState('dark');
+  const [theme, setTheme] = useState('light');
   const [pixelRatioClamp, setPixelRatioClamp] = useState(1.5);
   const [viewportScale, setViewportScale] = useState(1.0);
   const [targetFps, setTargetFps] = useState(30);
@@ -42,7 +42,7 @@ export default function ThreeSceneWithGPU() {
     if (!mountRef.current) return;
 
     // Create the Three.js scene
-    const { cleanup, gpuMonitor: monitor, scene, renderer, setPerformanceMode, setTargetFps: setTfps, setBackgroundFps: setBfps, setPixelRatioClamp, setViewportScale, setTheme: setSceneTheme, getCurrentSettings, currentTheme } = createDoorScene(mountRef.current);
+    const { cleanup, gpuMonitor: monitor, scene, renderer, setPerformanceMode, setTargetFps: setTfps, setBackgroundFps: setBfps, setPixelRatioClamp, setViewportScale, setTheme: setSceneTheme, getCurrentSettings, currentTheme } = createModelScene(mountRef.current);
     sceneRef.current = { cleanup, scene, renderer, setPerformanceMode, setTfps, setBfps, setPixelRatioClamp, setViewportScale, setSceneTheme, getCurrentSettings };
     setGpuMonitor(monitor);
     
@@ -203,6 +203,7 @@ export default function ThreeSceneWithGPU() {
                   <select value={theme} onChange={(e) => setTheme(e.target.value)} style={{ padding: '4px 6px', fontSize: 12 }}>
                     <option value="dark">Dark (energy-friendly)</option>
                     <option value="light">Light</option>
+                    <option value="oled">OLED (pure black)</option>
                     <option value="eink">E-Ink (grayscale)</option>
                     <option value="high-contrast">High Contrast</option>
                   </select>
@@ -264,13 +265,14 @@ export default function ThreeSceneWithGPU() {
           }}>
             <div style={{ top: 0, zIndex: 1, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 18px', gap: 12 }}>
-                <div style={{ fontFamily: 'monospace', fontSize: 24, color: 'orange', fontWeight: 700 }}>Sustainability UX Dashboard</div>
+                <div style={{ fontFamily: 'monospace', fontSize: 24, color: 'white', fontWeight: 700 }}>Sustainability UX Dashboard</div>
                 <div style={{ position: 'absolute', right: 18 }}>
                   <button onClick={() => setShowDashboard(false)} style={{
-                    background: 'rgba(249, 247, 247, 0.25)',
-                    color: 'rgba(245, 9, 9, 0.25)',
+                    background: 'rgba(248, 10, 10, 0.25)',
+                    color: 'white',
                     border: '1px solid rgba(230, 12, 12, 0.25)',
                     borderRadius: 10,
+                    fontWeight: 'bold',
                     padding: '8px 12px',
                     cursor: 'pointer'
                   }}>Close</button>

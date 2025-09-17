@@ -9,7 +9,7 @@ function useRollingBuffer(size) {
   return [ref, push];
 }
 
-function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100 }) {
+function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100, strokeWidth = 2, area = false, areaOpacity = 0.15 }) {
   const padding = 8;
   const w = width - padding * 2;
   const h = height - padding * 2;
@@ -23,6 +23,20 @@ function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rg
       return `${x},${y}`;
     }).join(' ');
   }, [data, w, h, height, padding, min, max]);
+  const areaPoints = useMemo(() => {
+    if (!data || data.length === 0) return '';
+    const len = data.length;
+    const baselineY = height - padding;
+    const leftX = padding;
+    const rightX = width - padding;
+    const linePts = data.map((v, i) => {
+      const x = (i / Math.max(1, len - 1)) * w + padding;
+      const clamped = Math.max(min, Math.min(max, v));
+      const y = height - padding - ((clamped - min) / (max - min)) * h;
+      return `${x},${y}`;
+    }).join(' ');
+    return `${leftX},${baselineY} ${linePts} ${rightX},${baselineY}`;
+  }, [data, w, h, height, padding, min, max]);
 
   return (
     <svg width={width} height={height} style={{ display: 'block', background: bg, borderRadius: 8 }}>
@@ -33,7 +47,10 @@ function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rg
           ))}
         </g>
       )}
-      <polyline fill="none" stroke={color} strokeWidth="2" points={points} />
+      {area && (
+        <polygon fill={color} opacity={areaOpacity} points={areaPoints} />
+      )}
+      <polyline fill="none" stroke={color} strokeWidth={strokeWidth} points={points} />
     </svg>
   );
 }
@@ -87,6 +104,8 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const [fpsBuf, pushFps] = useRollingBuffer(120);
   const [utilBuf, pushUtil] = useRollingBuffer(120);
   const [tempBuf, pushTemp] = useRollingBuffer(120);
+  const [powerBuf, pushPower] = useRollingBuffer(120);
+  const [co2Buf, pushCo2] = useRollingBuffer(120);
 
   useEffect(() => {
     if (!gpuMonitor) return;
@@ -96,6 +115,9 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
       pushFps(s.fps || 0);
       pushUtil(s.gpu.utilization || 0);
       pushTemp(s.gpu.temperature || 0);
+      const p = s.gpu.power || 0;
+      pushPower(p);
+      pushCo2(p * gridFactorGramsPerWh);
     }, 200);
     return () => clearInterval(id);
   }, [gpuMonitor]);
@@ -118,7 +140,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const co2Opt = powerOpt * gridFactorGramsPerWh;
 
   // Estimate theme/resolution influence (illustrative model)
-  const themeFactor = settings?.theme === 'dark' ? 0.95 : settings?.theme === 'eink' ? 0.9 : settings?.theme === 'high-contrast' ? 0.98 : 1.0;
+  const themeFactor = settings?.theme === 'dark' ? 0.9 : settings?.theme === 'oled' ? 0.85 : settings?.theme === 'eink' ? 0.88 : settings?.theme === 'high-contrast' ? 0.96 : 1.0;
   const resolutionFactor = (settings ? (Math.min(3, Math.max(0.5, settings.pixelRatioClamp || 1.5)) / 3) : (1.5/3))
     * (settings ? (Math.min(1, Math.max(0.3, settings.viewportScale || 1))) : 1);
   const fpsFactor = settings ? Math.min(1, (settings.targetFps || 30) / 60) : 0.5;
@@ -210,27 +232,56 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
           </div>
         </div>
 
-        <div style={{ ...cardStyle, background: 'linear-gradient(145deg, rgba(239, 189, 160, 0.5), rgba(128, 100, 229, 0.25))' }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Geometry & Draw Calls</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>Draw Calls</div>
-              <div style={{ fontSize: 16 }}>{stats.drawCalls}</div>
+        {/* Energy Breakdown Pie (UI components) - moved up */}
+        <div style={{ ...cardStyle, background: 'linear-gradient(145deg, rgba(27, 219, 55, 0.5), rgba(239,68,68,0.25))' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Energy Breakdown</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, alignItems: 'center' }}>
+            <div style={{
+              width: 180,
+              height: 180,
+              borderRadius: '50%',
+              background: 'conic-gradient(#22D3EE 0 30%, #10B981 30% 65%, #F59E0B 65% 80%, #F43F5E 80% 100%)',
+              margin: '0 auto',
+              position: 'relative'
+            }}>
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'monospace', fontSize: 14 }}>UI</div>
             </div>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>Triangles</div>
-              <div style={{ fontSize: 16 }}>{stats.triangles}</div>
+            <div style={{ display: 'grid', gap: 6, fontFamily: 'monospace', fontSize: 12 }}>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#22D3EE', borderRadius: 2, marginRight: 6 }}></span> Rendering — 30%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#10B981', borderRadius: 2, marginRight: 6 }}></span> Media — 35%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F59E0B', borderRadius: 2, marginRight: 6 }}></span> Networking — 15%</div>
+              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F43F5E', borderRadius: 2, marginRight: 6 }}></span> Other — 20%</div>
             </div>
           </div>
         </div>
 
-        {/* Trends (energy & CO₂) */}
+        {/* Trends (Power & CO₂) */}
         <div style={{ ...cardStyle }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Trends (energy & CO₂)</div>
-          <LineChart data={[...fpsBuf.current].map((_, i) => {
-            const p = fpsBuf.current[i] || 0;
-            return Math.max(5, Math.min(200, p * gridFactorGramsPerWh));
-          })} color="#22D3EE" min={0} max={200} width={680} height={120} />
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Trends (Power & CO₂)</div>
+          {(() => {
+            const powerData = [...powerBuf.current];
+            const co2Data = [...co2Buf.current];
+            const dynPowerMax = Math.max(50, Math.max(...powerData, 0) * 1.2);
+            const dynCo2Max = Math.max(50, Math.max(...co2Data, 0) * 1.2);
+            return (
+              <div style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>Power (W)</div>
+                    <div style={{ fontSize: 12, opacity: 0.6 }}>{(powerData[powerData.length - 1] || 0).toFixed(0)} W</div>
+                  </div>
+                  <LineChart data={powerData} color="#8B5CF6" min={0} max={dynPowerMax} width={680} height={110} strokeWidth={2.5} area areaOpacity={0.18} />
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <div style={{ fontSize: 12, opacity: 0.8 }}>CO₂ (g/hour)</div>
+                    <div style={{ fontSize: 12, opacity: 0.6 }}>{(co2Data[co2Data.length - 1] || 0).toFixed(0)} g</div>
+                  </div>
+                  <LineChart data={co2Data} color="#22D3EE" min={0} max={dynCo2Max} width={680} height={110} strokeWidth={2.5} area areaOpacity={0.18} />
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         <div style={cardStyle}>
@@ -317,25 +368,17 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
           </div>
         </div>
 
-        {/* Energy Breakdown Pie (UI components) */}
-        <div style={{ ...cardStyle }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Energy Breakdown</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 12, alignItems: 'center' }}>
-            <div style={{
-              width: 180,
-              height: 180,
-              borderRadius: '50%',
-              background: 'conic-gradient(#22D3EE 0 30%, #10B981 30% 65%, #F59E0B 65% 80%, #F43F5E 80% 100%)',
-              margin: '0 auto',
-              position: 'relative'
-            }}>
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'monospace', fontSize: 14 }}>UI</div>
+        {/* Geometry & Draw Calls - moved down */}
+        <div style={{ ...cardStyle, background: 'linear-gradient(145deg, rgba(239, 189, 160, 0.5), rgba(128, 100, 229, 0.25))' }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Geometry & Draw Calls</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>Draw Calls</div>
+              <div style={{ fontSize: 16 }}>{stats.drawCalls}</div>
             </div>
-            <div style={{ display: 'grid', gap: 6, fontFamily: 'monospace', fontSize: 12 }}>
-              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#22D3EE', borderRadius: 2, marginRight: 6 }}></span> Rendering — 30%</div>
-              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#10B981', borderRadius: 2, marginRight: 6 }}></span> Media — 35%</div>
-              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F59E0B', borderRadius: 2, marginRight: 6 }}></span> Networking — 15%</div>
-              <div><span style={{ display: 'inline-block', width: 10, height: 10, background: '#F43F5E', borderRadius: 2, marginRight: 6 }}></span> Other — 20%</div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>Triangles</div>
+              <div style={{ fontSize: 16 }}>{stats.triangles}</div>
             </div>
           </div>
         </div>
