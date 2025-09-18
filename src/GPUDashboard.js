@@ -9,42 +9,67 @@ function useRollingBuffer(size) {
   return [ref, push];
 }
 
-function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100, strokeWidth = 2, area = false, areaOpacity = 0.15 }) {
+function LineChart({ data, width = 300, height = 80, color = '#4CAF50', bg = 'rgba(255,255,255,0.06)', grid = true, min = 0, max = 100, strokeWidth = 2, area = false, areaOpacity = 0.15, yAxis = true, yTicks }) {
   const padding = 8;
-  const w = width - padding * 2;
+  const yAxisSpace = yAxis ? 28 : 0;
+  const w = width - padding * 2 - yAxisSpace;
   const h = height - padding * 2;
+  const tickValues = React.useMemo(() => (yTicks && yTicks.length ? yTicks : [0, 20, 40, 60, 80, 100]), [yTicks]);
+  const visibleTickValues = React.useMemo(() => tickValues.filter((v) => v >= min && v <= max), [tickValues, min, max]);
+  const denom = Math.max(1e-6, max - min);
   const points = useMemo(() => {
     if (!data || data.length === 0) return '';
     const len = data.length;
     return data.map((v, i) => {
-      const x = (i / Math.max(1, len - 1)) * w + padding;
+      const x = (i / Math.max(1, len - 1)) * w + padding + yAxisSpace;
       const clamped = Math.max(min, Math.min(max, v));
       const y = height - padding - ((clamped - min) / (max - min)) * h;
       return `${x},${y}`;
     }).join(' ');
-  }, [data, w, h, height, padding, min, max]);
+  }, [data, w, h, height, padding, min, max, yAxisSpace]);
   const areaPoints = useMemo(() => {
     if (!data || data.length === 0) return '';
     const len = data.length;
     const baselineY = height - padding;
-    const leftX = padding;
+    const leftX = padding + yAxisSpace;
     const rightX = width - padding;
     const linePts = data.map((v, i) => {
-      const x = (i / Math.max(1, len - 1)) * w + padding;
+      const x = (i / Math.max(1, len - 1)) * w + padding + yAxisSpace;
       const clamped = Math.max(min, Math.min(max, v));
       const y = height - padding - ((clamped - min) / (max - min)) * h;
       return `${x},${y}`;
     }).join(' ');
     return `${leftX},${baselineY} ${linePts} ${rightX},${baselineY}`;
-  }, [data, w, h, height, padding, min, max]);
+  }, [data, w, h, height, padding, min, max, yAxisSpace]);
 
   return (
     <svg width={width} height={height} style={{ display: 'block', background: bg, borderRadius: 8 }}>
       {grid && (
         <g opacity="0.15" stroke="#ffffff">
-          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
-            <line key={t} x1={padding} x2={width - padding} y1={padding + (h * t)} y2={padding + (h * t)} />
-          ))}
+          {visibleTickValues.map((tick) => {
+            const t = (tick - min) / denom; // 0..1 from bottom
+            const yPos = height - padding - (t * h);
+            return (
+              <line key={`g-${tick}`} x1={padding + yAxisSpace} x2={width - padding} y1={yPos} y2={yPos} />
+            );
+          })}
+        </g>
+      )}
+      {yAxis && (
+        <g>
+          <line x1={padding + yAxisSpace} x2={padding + yAxisSpace} y1={padding} y2={height - padding} stroke="#ffffff" opacity="0.25" />
+          {visibleTickValues.map((tick) => {
+            const t = (tick - min) / denom; // 0..1 from bottom
+            const yPos = height - padding - (t * h);
+            return (
+              <g key={`y-${tick}`}>
+                <line x1={padding + yAxisSpace - 4} x2={padding + yAxisSpace} y1={yPos} y2={yPos} stroke="#ffffff" opacity="0.35" />
+                <text x={padding + yAxisSpace - 6} y={yPos} textAnchor="end" dominantBaseline="middle" fill="#ffffff" fontFamily="monospace" fontSize="10" opacity="0.7">
+                  {tick}
+                </text>
+              </g>
+            );
+          })}
         </g>
       )}
       {area && (
@@ -200,7 +225,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>FPS</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.fps.toFixed(1)}</div>
           </div>
-          <LineChart data={[...fpsBuf.current]} color="#00E5FF" max={120} />
+          <LineChart data={[...fpsBuf.current]} color="#00E5FF" min={0} max={50} yTicks={[0,10,20,30,40,50]} />
         </div>
 
         <div style={cardStyle}>
@@ -208,7 +233,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>GPU Utilization</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.gpu.utilization}%</div>
           </div>
-          <LineChart data={[...utilBuf.current]} color="#34D399" />
+          <LineChart data={[...utilBuf.current]} color="#34D399" min={0} max={110} yTicks={[0,20,40,60,80,100]} />
         </div>
 
         <div style={cardStyle}>
