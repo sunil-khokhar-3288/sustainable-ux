@@ -165,6 +165,8 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const co2Opt = powerOpt * gridFactorGramsPerWh;
   const energyReductionPct = powerBase > 0 ? ((powerBase - powerOpt) / powerBase) * 100 : 0;
   const co2ReductionPct = co2Base > 0 ? ((co2Base - co2Opt) / co2Base) * 100 : 0;
+  const energySavedAbs = Math.max(0, powerBase - powerOpt);
+  const co2SavedAbs = Math.max(0, co2Base - co2Opt);
 
   // Estimate theme/resolution influence (illustrative model)
   const themeFactor = settings?.theme === 'dark' ? 0.9 : settings?.theme === 'oled' ? 0.85 : settings?.theme === 'eink' ? 0.88 : settings?.theme === 'high-contrast' ? 0.96 : 1.0;
@@ -356,8 +358,25 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             colorLeft="#F43F5E"
             colorRight="#10B981"
           />
-          <div style={{ fontFamily: 'monospace', fontSize: 12, marginTop: 6, color: energyReductionPct >= 0 ? '#10B981' : '#F43F5E' }}>
-            {energyReductionPct >= 0 ? 'Reduction' : 'Increase'}: {Math.abs(energyReductionPct).toFixed(1)}%
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: energyReductionPct >= 0 ? 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.35))' : 'linear-gradient(135deg, rgba(244,63,94,0.25), rgba(190,18,60,0.35))',
+              border: energyReductionPct >= 0 ? '1px solid rgba(16,185,129,0.45)' : '1px solid rgba(244,63,94,0.45)',
+              color: '#E8FFF7',
+              fontFamily: 'monospace'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>{energyReductionPct >= 0 ? 'Energy reduction' : 'Energy increase'}</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>
+                  {Math.abs(energyReductionPct).toFixed(1)}%
+                </div>
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                {energyReductionPct >= 0 ? '≈ ' + energySavedAbs.toFixed(1) + ' W saved' : '≈ ' + Math.abs(energySavedAbs).toFixed(1) + ' W more'}
+              </div>
+            </div>
           </div>
           <div style={{ height: 12 }} />
           <BarComparison
@@ -371,8 +390,25 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             colorLeft="#F59E0B"
             colorRight="#22D3EE"
           />
-          <div style={{ fontFamily: 'monospace', fontSize: 12, marginTop: 6, color: co2ReductionPct >= 0 ? '#10B981' : '#F43F5E' }}>
-            {co2ReductionPct >= 0 ? 'Reduction' : 'Increase'}: {Math.abs(co2ReductionPct).toFixed(1)}%
+          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{
+              padding: '8px 12px',
+              borderRadius: 10,
+              background: co2ReductionPct >= 0 ? 'linear-gradient(135deg, rgba(16,185,129,0.25), rgba(5,150,105,0.35))' : 'linear-gradient(135deg, rgba(244,63,94,0.25), rgba(190,18,60,0.35))',
+              border: co2ReductionPct >= 0 ? '1px solid rgba(16,185,129,0.45)' : '1px solid rgba(244,63,94,0.45)',
+              color: '#E8FFF7',
+              fontFamily: 'monospace'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontSize: 13, opacity: 0.9 }}>{co2ReductionPct >= 0 ? 'CO₂ reduction' : 'CO₂ increase'}</div>
+                <div style={{ fontSize: 18, fontWeight: 800 }}>
+                  {Math.abs(co2ReductionPct).toFixed(1)}%
+                </div>
+              </div>
+              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>
+                {co2ReductionPct >= 0 ? '≈ ' + co2SavedAbs.toFixed(1) + ' g/hour saved' : '≈ ' + Math.abs(co2SavedAbs).toFixed(1) + ' g/hour more'}
+              </div>
+            </div>
           </div>
           <div style={{ height: 12 }} />
           <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.9 }}>
