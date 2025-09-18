@@ -262,7 +262,7 @@ export default function ThreeSceneWithGPU() {
           }}>
             <div style={{ top: 0, zIndex: 1, borderBottom: '1px solid rgba(0,0,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 18px', gap: 12 }}>
-                <div style={{ fontFamily: 'monospace', fontSize: 24, color: 'white', fontWeight: 700 }}>Sustainability UX Dashboard</div>
+                <div style={{ fontFamily: 'monospace', fontSize: 24, color: 'white', fontWeight: 700 }}>Sustainability UI/UX Dashboard</div>
                 <div style={{ position: 'absolute', right: 18 }}>
                   <button onClick={() => setShowDashboard(false)} style={{
                     background: 'rgba(248, 10, 10, 0.25)',
