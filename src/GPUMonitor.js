@@ -90,22 +90,8 @@ export class GPUMonitor {
       const rendererInfo = this.gl.getParameter(this.gl.RENDERER);
       const vendorInfo = this.gl.getParameter(this.gl.VENDOR);
       
-      // Get GPU memory info if available (NVX extension constants)
-      try {
-        const GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX = 0x9049 - 0x0002; // 0x9047
-        const GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX = 0x904A - 0x0002; // 0x9048
-        if (this.gl.getParameter) {
-          const total = this.gl.getParameter(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX);
-          const avail = this.gl.getParameter(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX);
-          if (typeof total === 'number' && typeof avail === 'number') {
-            this.stats.memory.total = total;
-            this.stats.memory.available = avail;
-            this.stats.memory.used = Math.max(0, total - avail);
-          }
-        }
-      } catch (_) {
-        // ignore if not supported
-      }
+      // Attempt to populate GPU memory via NVX extension
+      this.updateNVXMemory();
       
       console.log('GPU Info:', {
         renderer: rendererInfo,
@@ -116,6 +102,34 @@ export class GPUMonitor {
     } catch (error) {
       console.warn('Could not get GPU info:', error);
     }
+  }
+
+  updateNVXMemory() {
+    try {
+      // NVX constants per spec (values are in KB)
+      const GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX = 0x9047;
+      const GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX = 0x9048;
+      const GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX = 0x9049;
+      if (this.gl && this.gl.getParameter) {
+        const totalKb = this.gl.getParameter(GPU_MEMORY_INFO_TOTAL_AVAILABLE_MEMORY_NVX);
+        const availKb = this.gl.getParameter(GPU_MEMORY_INFO_CURRENT_AVAILABLE_VIDMEM_NVX);
+        if (typeof totalKb === 'number' && typeof availKb === 'number' && isFinite(totalKb) && isFinite(availKb)) {
+          const totalBytes = totalKb * 1024;
+          const availBytes = availKb * 1024;
+          this.stats.memory.total = totalBytes;
+          this.stats.memory.available = availBytes;
+          this.stats.memory.used = Math.max(0, totalBytes - availBytes);
+        }
+        const dedicatedKb = (() => { try { return this.gl.getParameter(GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX); } catch (_) { return null; } })();
+        if (typeof dedicatedKb === 'number' && isFinite(dedicatedKb)) {
+          this.stats.memory.dedicated = dedicatedKb * 1024;
+        }
+        return true;
+      }
+    } catch (_) {
+      // ignore if not supported
+    }
+    return false;
   }
   
   startMonitoring() {
@@ -185,8 +199,20 @@ export class GPUMonitor {
       // JS Heap memory (Chrome-only)
       if (performance && performance.memory) {
         this.stats.memory.jsHeap.used = performance.memory.usedJSHeapSize || 0;
-        this.stats.memory.jsHeap.total = performance.memory.totalJSHeapSize || 0;
+        this.stats.memory.jsHeap.total = performance.memory.totalJSHeapSize || 0; 
         this.stats.memory.jsHeap.limit = performance.memory.jsHeapSizeLimit || 0;
+      }
+
+      // Refresh NVX memory readings if available; otherwise estimate to avoid showing zero
+      const hasNVX = this.updateNVXMemory();
+      if (!hasNVX) {
+        const estTexturesBytes = (this.stats.memory.webgl.textures || 0) * 6 * 1024 * 1024; // ~6 MiB per texture
+        const estGeometriesBytes = (this.stats.memory.webgl.geometries || 0) * 1.5 * 1024 * 1024; // ~1.5 MiB per geometry
+        const estTrianglesBytes = (this.stats.triangles || 0) * 100; // ~100 bytes per triangle heuristic
+        const estimatedUsed = Math.max(estTexturesBytes + estGeometriesBytes, estTrianglesBytes);
+        if (!this.stats.memory.used || this.stats.memory.used === 0) {
+          this.stats.memory.used = estimatedUsed;
+        }
       }
       
     } catch (error) {

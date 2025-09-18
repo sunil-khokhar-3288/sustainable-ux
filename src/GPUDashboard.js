@@ -184,10 +184,10 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18, padding: inModal ? '18px' : '0', paddingBottom: 0 }}>
         {/* Energy (kWh) - amber */}
         <div style={{ ...cardStyle, padding: 16, background: 'linear-gradient(145deg, rgba(120,53,15,0.5), rgba(245,158,11,0.25))', border: '1px solid rgba(245,158,11,0.35)' }}>
-          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>Energy (kWh)</div>
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.85 }}>Energy (W)</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 6 }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: '#FACC15' }}>{(stats.gpu.power / 1000).toFixed(6)}</div>
-            <div style={{ fontSize: 12, opacity: 0.85 }}>kWh</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: '#FACC15' }}>{(stats.gpu.power).toFixed(2)}</div>
+            <div style={{ fontSize: 12, opacity: 0.85 }}>W</div>
           </div>
           <div style={{ fontSize: 11, opacity: 0.8, marginTop: 4 }}>Theme: {settings?.theme ?? 'n/a'}</div>
         </div>
@@ -385,7 +385,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
 
         <div style={cardStyle}>
           <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Memory</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <div>
               <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Used</div>
               <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)} MB</div>
@@ -394,10 +394,10 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
               <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Total</div>
               <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.total / 1048576).toFixed(1)} MB</div>
             </div>
-            <div>
+            {/* <div>
               <div style={{ opacity: 0.8, fontSize: 12 }}>GPU Mem Used</div>
               <div style={{ fontSize: 16 }}>{(stats.memory?.used / 1048576).toFixed(1)} MB</div>
-            </div>
+            </div> */}
           </div>
         </div>
         
@@ -421,7 +421,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
           <div style={{ ...cardStyle }}>
             <div style={{ fontFamily: 'monospace', fontSize: 14, marginBottom: 10, opacity: 0.9 }}>Quick Actions</div>
             <div style={{ display: 'grid', gap: 10 }}>
-              <button onClick={onApplyOptimizations} style={{
+              {/* <button onClick={onApplyOptimizations} style={{
                 background: 'linear-gradient(135deg, #10B981, #059669)',
                 color: '#0b0b0b',
                 border: 'none',
@@ -430,7 +430,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
                 cursor: 'pointer',
                 fontFamily: 'monospace',
                 fontSize: 13
-              }}>Apply recommended optimizations</button>
+              }}>Apply recommended optimizations</button> */}
               <button onClick={onExportMetrics} style={{
                 background: 'transparent',
                 color: '#E0F2F1',
@@ -443,16 +443,17 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
               }}>Export metrics (CSV)</button>
             </div>
           </div>
+        </div>
 
-          <div style={{ ...cardStyle }}>
-            <div style={{ fontFamily: 'monospace', fontSize: 14, marginBottom: 10, opacity: 0.9 }}>Context & Tips</div>
-            <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6, opacity: 0.85 }}>
-              <li>Use dark mode on OLED to reduce display energy.</li>
-              <li>Prefer WebP/AVIF for images to reduce bytes transferred.</li>
-              <li>Virtualization saves rendering cost for large lists.</li>
-              <li>Lazy-load videos and images; avoid autoplay.</li>
-            </ul>
-          </div>
+        {/* Context & Tips moved as its own card so it occupies the right column */}
+        <div style={{ ...cardStyle }}>
+          <div style={{ fontFamily: 'monospace', fontSize: 14, marginBottom: 10, opacity: 0.9 }}>Context & Tips</div>
+          <ul style={{ margin: 0, paddingLeft: 16, lineHeight: 1.6, opacity: 0.85 }}>
+            <li>Use dark mode on OLED to reduce display energy.</li>
+            <li>Prefer WebP/AVIF for images to reduce bytes transferred.</li>
+            <li>Virtualization saves rendering cost for large lists.</li>
+            <li>Lazy-load videos and images; avoid autoplay.</li>
+          </ul>
         </div>
       </div>
     </div>

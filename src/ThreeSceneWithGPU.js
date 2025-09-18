@@ -203,9 +203,6 @@ export default function ThreeSceneWithGPU() {
                   <select value={theme} onChange={(e) => setTheme(e.target.value)} style={{ padding: '4px 6px', fontSize: 12 }}>
                     <option value="dark">Dark (energy-friendly)</option>
                     <option value="light">Light</option>
-                    <option value="oled">OLED (pure black)</option>
-                    <option value="eink">E-Ink (grayscale)</option>
-                    <option value="high-contrast">High Contrast</option>
                   </select>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
