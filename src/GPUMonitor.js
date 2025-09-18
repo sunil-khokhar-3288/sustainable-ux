@@ -213,7 +213,7 @@ export class GPUMonitor {
     const tempSpan = 35; // range up to ~75C
     this.stats.gpu.temperature = baseTemp + (tempSpan * (utilization / 100));
 
-    // Power estimate: theme baseline + dynamic component scaled by utilization
+    // Power estimate: theme baseline + dynamic component scaled by utilization data
     const themeBase = this.themeBaselineWatts[this.currentTheme] ?? 10;
     const dynamicWatts = 70; // headroom for load-dependent power
     this.stats.gpu.power = Math.round(themeBase + dynamicWatts * (utilization / 100));
