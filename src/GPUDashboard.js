@@ -225,7 +225,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>FPS</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.fps.toFixed(1)}</div>
           </div>
-          <LineChart data={[...fpsBuf.current]} color="#00E5FF" min={0} max={50} yTicks={[0,10,20,30,40,50]} />
+          <LineChart data={[...fpsBuf.current]} color="#00E5FF" min={0} max={50} yTicks={[0,10,20,30,40,50]} width={400} height={100}/>
         </div>
 
         <div style={cardStyle}>
@@ -233,7 +233,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>GPU Utilization</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.gpu.utilization}%</div>
           </div>
-          <LineChart data={[...utilBuf.current]} color="#34D399" min={0} max={110} yTicks={[0,20,40,60,80,100]} />
+          <LineChart data={[...utilBuf.current]} color="#34D399" min={0} max={110} yTicks={[0,20,40,60,80,100]} width={650} height={100} />
         </div>
 
         <div style={cardStyle}>
@@ -241,7 +241,7 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             <div style={{ fontFamily: 'monospace', fontSize: 13, opacity: 0.85 }}>GPU Temperature</div>
             <div style={{ fontFamily: 'monospace', fontSize: 18 }}>{stats.gpu.temperature?.toFixed(1)}°C</div>
           </div>
-          <LineChart data={[...tempBuf.current]} color="#F59E0B" max={90} />
+          <LineChart data={[...tempBuf.current]} color="#F59E0B" max={90} width={400} height={150}/>
         </div>
 
         <div style={{ ...cardStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'linear-gradient(145deg, rgba(120,53,15,0.5), rgba(245,158,11,0.25))' }}>
