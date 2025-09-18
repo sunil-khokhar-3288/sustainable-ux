@@ -163,6 +163,8 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
   const powerOpt = optimizedPowerAvg ?? stats?.gpu?.power ?? 0;
   const co2Base = powerBase * gridFactorGramsPerWh;
   const co2Opt = powerOpt * gridFactorGramsPerWh;
+  const energyReductionPct = powerBase > 0 ? ((powerBase - powerOpt) / powerBase) * 100 : 0;
+  const co2ReductionPct = co2Base > 0 ? ((co2Base - co2Opt) / co2Base) * 100 : 0;
 
   // Estimate theme/resolution influence (illustrative model)
   const themeFactor = settings?.theme === 'dark' ? 0.9 : settings?.theme === 'oled' ? 0.85 : settings?.theme === 'eink' ? 0.88 : settings?.theme === 'high-contrast' ? 0.96 : 1.0;
@@ -308,59 +310,6 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             );
           })()}
         </div>
-
-        <div style={cardStyle}>
-          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Memory</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Used</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)} MB</div>
-            </div>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Total</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.total / 1048576).toFixed(1)} MB</div>
-            </div>
-            <div>
-              <div style={{ opacity: 0.8, fontSize: 12 }}>GPU Mem Used</div>
-              <div style={{ fontSize: 16 }}>{(stats.memory?.used / 1048576).toFixed(1)} MB</div>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ ...cardStyle }}>
-          <BarComparison
-            title="Energy (Average Power)"
-            leftLabel="Baseline"
-            rightLabel="Optimized"
-            leftValue={powerBase}
-            rightValue={powerOpt}
-            unit=" W"
-            max={Math.max(powerBase, powerOpt, 1)}
-            colorLeft="#F43F5E"
-            colorRight="#10B981"
-          />
-          <div style={{ height: 12 }} />
-          <BarComparison
-            title="CO₂ Emissions (per hour)"
-            leftLabel="Baseline"
-            rightLabel="Optimized"
-            leftValue={co2Base}
-            rightValue={co2Opt}
-            unit=" g"
-            max={Math.max(co2Base, co2Opt, 1)}
-            colorLeft="#F59E0B"
-            colorRight="#22D3EE"
-          />
-          <div style={{ height: 12 }} />
-          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.9 }}>
-            Estimated power with current settings: <strong>{estimatedPower} W</strong>
-          </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 11, opacity: 0.7, marginTop: 4 }}>
-            Theme factor: {themeFactor.toFixed(2)} • Resolution factor: {resolutionFactor.toFixed(2)} • FPS factor: {fpsFactor.toFixed(2)}
-          </div>
-        </div>
-
-        {/* Comparison table */}
         <div style={{ ...cardStyle }}>
           <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Rendering Comparison</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -392,6 +341,66 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
             </div>
           </div>
         </div>
+
+       
+
+        <div style={{ ...cardStyle }}>
+          <BarComparison
+            title="Energy (Average Power)"
+            leftLabel="Baseline"
+            rightLabel="Optimized"
+            leftValue={powerBase}
+            rightValue={powerOpt}
+            unit=" W"
+            max={Math.max(powerBase, powerOpt, 1)}
+            colorLeft="#F43F5E"
+            colorRight="#10B981"
+          />
+          <div style={{ fontFamily: 'monospace', fontSize: 12, marginTop: 6, color: energyReductionPct >= 0 ? '#10B981' : '#F43F5E' }}>
+            {energyReductionPct >= 0 ? 'Reduction' : 'Increase'}: {Math.abs(energyReductionPct).toFixed(1)}%
+          </div>
+          <div style={{ height: 12 }} />
+          <BarComparison
+            title="CO₂ Emissions (per hour)"
+            leftLabel="Baseline"
+            rightLabel="Optimized"
+            leftValue={co2Base}
+            rightValue={co2Opt}
+            unit=" g"
+            max={Math.max(co2Base, co2Opt, 1)}
+            colorLeft="#F59E0B"
+            colorRight="#22D3EE"
+          />
+          <div style={{ fontFamily: 'monospace', fontSize: 12, marginTop: 6, color: co2ReductionPct >= 0 ? '#10B981' : '#F43F5E' }}>
+            {co2ReductionPct >= 0 ? 'Reduction' : 'Increase'}: {Math.abs(co2ReductionPct).toFixed(1)}%
+          </div>
+          <div style={{ height: 12 }} />
+          <div style={{ fontFamily: 'monospace', fontSize: 12, opacity: 0.9 }}>
+            Estimated power with current settings: <strong>{estimatedPower} W</strong>
+          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 11, opacity: 0.7, marginTop: 4 }}>
+            Theme factor: {themeFactor.toFixed(2)} • Resolution factor: {resolutionFactor.toFixed(2)} • FPS factor: {fpsFactor.toFixed(2)}
+          </div>
+        </div>
+
+        <div style={cardStyle}>
+          <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Memory</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Used</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.used / 1048576).toFixed(1)} MB</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>JS Heap Total</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.jsHeap?.total / 1048576).toFixed(1)} MB</div>
+            </div>
+            <div>
+              <div style={{ opacity: 0.8, fontSize: 12 }}>GPU Mem Used</div>
+              <div style={{ fontSize: 16 }}>{(stats.memory?.used / 1048576).toFixed(1)} MB</div>
+            </div>
+          </div>
+        </div>
+        
 
         {/* Geometry & Draw Calls - moved down */}
         <div style={{ ...cardStyle, background: 'linear-gradient(145deg, rgba(239, 189, 160, 0.5), rgba(128, 100, 229, 0.25))' }}>
