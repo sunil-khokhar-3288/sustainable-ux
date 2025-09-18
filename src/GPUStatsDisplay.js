@@ -105,9 +105,9 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
         </div>
       )}
 
-      {optimizationInfo && (
+      {/* {optimizationInfo && (
         <div style={{ marginBottom: '8px', color: '#064e3b' }}>
-          <strong>Optimizations ({mode === 'optimized' ? 'Optimized' : 'Baseline'}):</strong>
+          <strong>Optimizations ({mode === 'optimized' ? 'Energy Saver' : 'Baseline'}):</strong>
           <div style={{ marginLeft: '10px' }}>
             <div>FPS Cap: {optimizationInfo.fpsCap} FPS</div>
             <div>Pixel Ratio Clamp: {optimizationInfo.pixelRatioMax}</div>
@@ -116,7 +116,7 @@ export function GPUStatsDisplay({ gpuMonitor, extraControls, mode, optimizationI
             <div>Pause on Hidden: {optimizationInfo.pauseOnHidden ? 'Yes' : 'No'}</div>
           </div>
         </div>
-      )}
+      )} */}
       
       <div style={{ marginBottom: '6px' }}>
         <strong style={{ color: '#064e3b' }}>GPU Utilization:</strong>
