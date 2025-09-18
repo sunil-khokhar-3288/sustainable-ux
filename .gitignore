@@ -1,4 +1,5 @@
 # Default ignored files
 /shelf/
 /workspace.xml
-/node_modules
+build
+node_modules
