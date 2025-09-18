@@ -251,12 +251,12 @@ export default function GPUDashboard({ gpuMonitor, baselinePowerAvg, optimizedPo
         <div style={{ ...cardStyle, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, background: 'linear-gradient(145deg, rgba(120,53,15,0.5), rgba(245,158,11,0.25))' }}>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Power</div>
-            <PieChart value={Math.min(100, (stats.gpu.power / 80) * 100)} color="#8B5CF6" />
+            <PieChart value={Math.min(100, (stats.gpu.power / 100) * 100)} color="#8B5CF6" />
             <div style={{ fontFamily: 'monospace', fontSize: 14, marginTop: 6 }}>{stats.gpu.power} W</div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontFamily: 'monospace', fontSize: 13, marginBottom: 8, opacity: 0.85 }}>Textures</div>
-            <PieChart value={Math.min(100, (stats.memory?.webgl?.textures || 0) / 64 * 100)} color="#22D3EE" />
+            <PieChart value={Math.min(100, (stats.memory?.webgl?.textures || 0) / 100 * 100)} color="#22D3EE" />
             <div style={{ fontFamily: 'monospace', fontSize: 14, marginTop: 6 }}>{stats.memory?.webgl?.textures || 0}</div>
           </div>
         </div>
