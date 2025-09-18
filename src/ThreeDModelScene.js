@@ -50,7 +50,7 @@ export function createModelScene(mountNode) {
     (gltf) => {
       model = gltf.scene;
       model.scale.set(0.5, 0.5, 0.5);
-      model.position.set(0, 0, 0);
+      model.position.set(-0.5, 1, 0);
       scene.add(model);
       isModelLoaded = true;
     },
