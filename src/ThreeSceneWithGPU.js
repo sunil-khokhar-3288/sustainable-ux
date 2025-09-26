@@ -209,14 +209,14 @@ export default function ThreeSceneWithGPU() {
                   <label style={{ fontSize: 11 }}>Target FPS: {targetFps}</label>
                   <input type="range" min="15" max="60" value={targetFps} onChange={(e) => setTargetFps(parseInt(e.target.value))} />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 11 }}>Background FPS: {backgroundFps}</label>
                   <input type="range" min="1" max="15" value={backgroundFps} onChange={(e) => setBackgroundFps(parseInt(e.target.value))} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 11 }}>Pixel Ratio Clamp: {pixelRatioClamp.toFixed(2)}</label>
                   <input type="range" min="0.5" max="3" step="0.1" value={pixelRatioClamp} onChange={(e) => setPixelRatioClamp(parseFloat(e.target.value))} />
-                </div>
+                </div> */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <label style={{ fontSize: 11 }}>Viewport Scale: {(viewportScale * 100).toFixed(0)}%</label>
                   <input type="range" min="0.3" max="1" step="0.05" value={viewportScale} onChange={(e) => setViewportScale(parseFloat(e.target.value))} />

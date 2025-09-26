@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { GPUMonitor } from './GPUMonitor';  // Ensure implemented or stubbed
 
 export function createModelScene(mountNode) {
@@ -41,22 +40,15 @@ export function createModelScene(mountNode) {
   scene.add(ambientLight);
   scene.add(directionalLight);
 
-  const loader = new GLTFLoader();
   let model = null;
   let isModelLoaded = false;
-
-  loader.load(
-    '/models/car.glb',  // Ensure model is in /public/models/car_model.glb
-    (gltf) => {
-      model = gltf.scene;
-      model.scale.set(0.5, 0.5, 0.5);
-      model.position.set(-0.5, 1, 0);
-      scene.add(model);
-      isModelLoaded = true;
-    },
-    undefined,
-    (error) => console.error('Model load error:', error)
-  );
+  // Create a simple red cube instead of loading a GLTF model
+  const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+  const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0xff0000 });
+  model = new THREE.Mesh(cubeGeometry, cubeMaterial);
+  model.position.set(0, 1, 0);
+  scene.add(model);
+  isModelLoaded = true;
 
   // Minimal overlay for current settings (metrics live in dashboard)
   const overlay = document.createElement('div');
@@ -196,6 +188,11 @@ export function createModelScene(mountNode) {
     const elapsed = now - lastRenderTime;
     const effInterval = getEffectiveIntervalMs(now);
     if (elapsed >= effInterval) {
+      // Continuous rotation for the cube (radians per second)
+      const rotationSpeedY = 0.6; // adjust to taste
+      if (isModelLoaded && model) {
+        model.rotation.y += rotationSpeedY * (elapsed / 1000);
+      }
       renderer.render(scene, camera);
       if (gpuMonitor && typeof gpuMonitor.onFrameRendered === 'function') {
         gpuMonitor.onFrameRendered(now);
@@ -308,10 +305,14 @@ export function createModelScene(mountNode) {
     renderer.domElement.removeEventListener('pointerleave', onPointerUp);
 
     if (model) {
-      model.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) child.material.dispose();
-      });
+      if (model.geometry) model.geometry.dispose();
+      if (model.material) {
+        if (Array.isArray(model.material)) {
+          model.material.forEach(m => m.dispose && m.dispose());
+        } else if (model.material.dispose) {
+          model.material.dispose();
+        }
+      }
     }
 
     gpuMonitor.destroy();
